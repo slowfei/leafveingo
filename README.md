@@ -89,16 +89,16 @@ go build 运行后打开：http://localhost:8080/
 输出：Hello world, Leafvingo web framework
 
 
-#### [进入Leafveingo基础入门](01.md)
+#### [进入Leafveingo基础入门](doc/01.md)
 
 框架功能{#框架功能}
 -------------
->1. [路由器机制](02.md)
->1. [静态文件解析](03.md)
->1. [控制器](04.md)
->1. [HttpSession](05.md)
->1. [HttpContext](06.md)
->1. [模板](07.md)
+>1. [路由器机制](doc/02.md)
+>1. [静态文件解析](doc/03.md)
+>1. [控制器](doc/04.md)
+>1. [HttpSession](doc/05.md)
+>1. [HttpContext](doc/06.md)
+>1. [模板](doc/07.md)
 
 ##
 #### 使用协议 [LICENSE](https://github.com/slowfei/leafveingo/blob/master/LICENSE)
