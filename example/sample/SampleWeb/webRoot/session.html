@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>SessionController</title>
+	<link rel="stylesheet" href="/themes/core/core.css">
+	<link rel="stylesheet" href="/themes/default/css/style.css">
+</head>
+<body>
+	<h1>HttpSession演示操作</h1>
+	
+<a href="/s/session.htm">http://localhost:8080/s/session.htm</a>
+<br/>
+<pre>
+//	基本的获取session
+func (s *SessionController) Session(sess session.HttpSession) string {
+
+	outString := ""
+
+	name, ok := sess.Get("name")
+	if !ok {
+		//	测试存储数据
+		sess.Set("name", "slowfei")
+		outString = "Has not been set to the name, refreshed look."
+	} else {
+		outString = fmt.Sprintf("%v, welcome", name.(string))
+	}
+
+	return fmt.Sprintf("get the session address: %p\n%v", sess, outString)
+}
+</pre>
+<br/>
+
+<a href="/s/context.htm">http://localhost:8080/s/context.htm</a>
+<br/>
+<pre>
+//	上下文对session的操作
+func (s *SessionController) Context(context *leafveingo.HttpContext) string {
+	//	cookie token会在一定时间会自动重置，这里就不选择重置了。
+	//	看需求而定是否需要重置。
+	sess, err := context.Session(false)
+
+	if nil != err {
+		return fmt.Sprintf("session get error:%v", err.Error())
+	}
+
+	outString := ""
+
+	name, ok := sess.Get("name")
+	if !ok {
+		//	测试存储数据
+		sess.Set("name", "slowfei")
+		outString = "Has not been set to the name, refreshed look."
+	} else {
+		outString = fmt.Sprintf("%v, welcome", name.(string))
+	}
+
+	return fmt.Sprintf("context get the session address: %p\n%v", sess, outString)
+}
+</pre>
+<br/>
+
+
+<a href="/s/form.htm">http://localhost:8080/s/form.htm</a>
+<br/>
+<pre>
+//	演示form token的操作
+func (s *SessionController) Form(context *leafveingo.HttpContext) leafveingo.HtmlOut {
+	token := context.FormTokenHTML()
+
+	html := `
+&#60;&#33;&#100;&#111;&#99;&#116;&#121;&#112;&#101;&#32;&#104;&#116;&#109;&#108;&#62;&#10;&#60;&#104;&#116;&#109;&#108;&#32;&#108;&#97;&#110;&#103;&#61;&#34;&#101;&#110;&#34;&#62;&#10;&#60;&#104;&#101;&#97;&#100;&#62;&#10;&#9;&#60;&#109;&#101;&#116;&#97;&#32;&#99;&#104;&#97;&#114;&#115;&#101;&#116;&#61;&#34;&#85;&#84;&#70;&#45;&#56;&#34;&#62;&#10;&#9;&#60;&#116;&#105;&#116;&#108;&#101;&#62;&#70;&#111;&#114;&#109;&#32;&#84;&#111;&#107;&#101;&#110;&#60;&#47;&#116;&#105;&#116;&#108;&#101;&#62;&#10;&#60;&#47;&#104;&#101;&#97;&#100;&#62;&#10;&#60;&#98;&#111;&#100;&#121;&#62;&#10;&#9;&#23581;&#35797;&#25552;&#20132;&#39564;&#35777;&#102;&#111;&#114;&#109;&#32;&#116;&#111;&#107;&#101;&#110;&#10;&#9;&#60;&#98;&#114;&#47;&#62;&#10;&#9;&#60;&#102;&#111;&#114;&#109;&#32;&#97;&#99;&#116;&#105;&#111;&#110;&#61;&#34;&#102;&#111;&#114;&#109;&#46;&#104;&#116;&#109;&#34;&#32;&#109;&#101;&#116;&#104;&#111;&#100;&#61;&#34;&#112;&#111;&#115;&#116;&#34;&#62;&#10;&#9;&#9;&#96;&#32;&#43;&#32;&#116;&#111;&#107;&#101;&#110;&#32;&#43;&#32;&#96;&#10;&#9;&#60;&#105;&#110;&#112;&#117;&#116;&#32;&#116;&#121;&#112;&#101;&#61;&#34;&#115;&#117;&#98;&#109;&#105;&#116;&#34;&#32;&#118;&#97;&#108;&#117;&#101;&#61;&#34;&#25552;&#20132;&#34;&#62;&#10;&#9;&#60;&#47;&#102;&#111;&#114;&#109;&#62;&#10;&#60;&#47;&#98;&#111;&#100;&#121;&#62;&#10;&#60;&#47;&#104;&#116;&#109;&#108;&#62;
+	`
+	return leafveingo.BodyHtml(html)
+}
+
+//	演示form token的验证操作
+func (s *SessionController) PostForm(context *leafveingo.HttpContext) string {
+	if context.CheckFormToken() {
+		return "form token check success."
+	} else {
+		return "form token check fail."
+	}
+}
+</pre>
+<br/>
+
+
+</body>
+</html>
