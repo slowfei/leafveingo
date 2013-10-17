@@ -69,6 +69,7 @@ import (
 type MainController struct {
 }
 
+//	控制器的默认请求访问的函数(Index)，URL结尾检测为"/"( http://localhost:8080/ )
 func (m *MainController) Index() string {
 	return "Hello world, Leafvingo web framework"
 }
@@ -78,14 +79,32 @@ func main() {
 	// 需要在编译目录下，建立个与AppName一样的目录和webRoot目录，默认名称LeafveingoWeb
 	// 具体可以看下(开发项目组织结构)
 	leafvein.SetAppName("SampleWeb")
+
+	// 原型：AddController(routerKey string, controller interface{})
+
 	leafvein.AddController("/", MainController{})
+	
+	//	启动
 	leafvein.Start()
+
+	//	特别说明：URL的访问规则 - AddController("router key",控制器{})
+	//	http://localhost:8080/[控制器router key][控制器函数]
+	//
+	//	URL规则请求例子：
+	//	控制器的函数名 = "User"(默认index)
+	//	router  key  = "/admin"  = http://localhost:8080/adminuser
+	//	router  key  = "/admin/" = http://localhost:8080/admin/user
+	//
+	//	控制器的函数名 = ""(默认index)
+	//	router  key  = "/admin"  = http://localhost:8080/adminindex
+	//	router  key  = "/admin/" = http://localhost:8080/admin/index
+	//	router  key  = "/" 		 = http://localhost:8080/
 }
 
 ```
-go build 运行后打开：http://localhost:8080/ 
+go build 编译后运行编译出来的文件，然后在浏览器中打开：`http://localhost:8080/ ` 这样就会默认进入到MainController的Index函数中。
 
-输出：Hello world, Leafvingo web framework
+然后浏览器中会输出：Hello world, Leafvingo web framework
 
 #### 出现的错误信息
 `can't find import: "github.com/slowfei/gosfcore/*..."`<br/>

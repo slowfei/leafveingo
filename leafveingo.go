@@ -125,7 +125,7 @@ type ISFLeafvein interface {
 
 	//	add controller
 	//
-	//	@router 	需要访问url路由设置。 e.g.: / == http://127.0.0.1/; admin/ == http://127.0.0.1/admin/
+	//	@routerKey 	需要访问url路由设置。 e.g.: / == http://127.0.0.1/; admin/ == http://127.0.0.1/admin/
 	//	@controller	控制器分为地址传递和值传递
 	//				值传递：
 	//				AddControllers("/Home/", HomeController{})
@@ -135,7 +135,7 @@ type ISFLeafvein interface {
 	//				AddControllers("/Admin/", &AdminController{})
 	//				跟值传递相反，每次请求时都会使用设置的控制器地址进行处理，应用结束也不会改变，每次请求控制器都不会改变内存地址
 	//				这里涉及到并发时同时使用一个内存地址处理的问题，不过目前还没有弄到锁，并发后期leafveingo会进行改进和处理。
-	AddController(router string, controller interface{})
+	AddController(routerKey string, controller interface{})
 
 	//	web application map
 	Application() SFHelper.Map
@@ -561,7 +561,7 @@ func (lv *sfLeafvein) Start() {
 
 }
 
-func (lv *sfLeafvein) AddController(router string, controller interface{}) {
+func (lv *sfLeafvein) AddController(routerKey string, controller interface{}) {
 
 	//	验证添加路由path的规则
 	//	字符串不等于nil || 查询不到"/" || "/" 不在首位

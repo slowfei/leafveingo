@@ -9,6 +9,7 @@ type MainController struct {
 	tag string // 主要为了区别struct不同的内存地址
 }
 
+//	控制器的默认请求访问的函数(Index)，URL结尾检测为"/"( http://localhost:8080/ )
 func (m *MainController) Index() string {
 	return "Hello world, Leafvingo web framework"
 }
@@ -39,6 +40,21 @@ func main() {
 	//	指针控制器演示
 	//	http://localhost:8080/pointer/
 	leafvein.AddController("/pointer/", &MainController{})
+
+	//  原型：AddController(routerKey string, controller interface{})
+	//
+	//	特别说明：URL的访问规则 - AddController("router key",控制器{})
+	//	http://localhost:8080/[控制器router key][控制器函数]
+	//
+	//	URL规则请求例子：
+	//	控制器的函数名 = "User"(默认index)
+	//	router  key  = "/admin"  = http://localhost:8080/adminuser
+	//	router  key  = "/admin/" = http://localhost:8080/admin/user
+	//
+	//	控制器的函数名 = ""(默认index)
+	//	router  key  = "/admin"  = http://localhost:8080/adminindex
+	//	router  key  = "/admin/" = http://localhost:8080/admin/index
+	//	router  key  = "/" 		 = http://localhost:8080/
 
 	//	高级路由器演示
 	//	http://localhost:8080/router/
