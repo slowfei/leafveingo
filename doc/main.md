@@ -17,7 +17,7 @@ Leafveingo web framework
 	└─src
 	   └─sample 			// app项目目录
 	      ├─SampleWeb		// app项目名称目录，需要与编译文件同一个目录，这样编译文件就会根据项目名称查找到所需要的文件
-	      │  ├─template		  // 存放模板文件目录
+	      │  ├─template     // 存放模板文件目录
 	      │  ├─webRoot 	 // web工作主目录，主要存放静态文件js、css、html...等公共访问文件，webRoot目录下都可以自定义分配安排，以下只是建议的项目规划
 	      │  │  ├─images 			// (可选) 一些网站所使用的公用图片目录
 	      │  │  ├─js 				// (可选) javascript 文件目录
@@ -26,7 +26,7 @@ Leafveingo web framework
 	      │  │     │  └─core.css 	  // (可选) css核心文件
 	      │  │     └─default 		// (可选) 默认css皮肤主题目录
 	      │  │        ├─css 		// (可选) 默认皮肤主题的css存放目录
-	      │  │        │  ├─images 	// (可选) 默认皮肤主题所使用的图片目录，这样style.css访问图片路径时更好操作。
+	      │  │        │  ├─images   // (可选) 默认皮肤主题所使用的图片目录，这样style.css访问图片路径时更好操作。
 	      │  │        │  └─style.css// (可选) 默认皮肤主题的css文件
 	      │  │        └─js 			// (可选) 默认皮肤主题所使用的javascript文件目录
 	      │  │           └─init.js 	// (可选) 默认皮肤主题所需要初始化的javascript函数或布局所使用的文件
