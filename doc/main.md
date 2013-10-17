@@ -18,7 +18,7 @@ Leafveingo web framework
 	   └─sample 			// app项目目录
 	      ├─SampleWeb		// app项目名称目录，需要与编译文件同一个目录，这样编译文件就会根据项目名称查找到所需要的文件
 	      │  ├─template     // 存放模板文件目录
-	      │  ├─webRoot 	 // web工作主目录，主要存放静态文件js、css、html...等公共访问文件，webRoot目录下都可以自定义分配安排，以下只是建议的项目规划
+	      │  ├─webRoot 	  // web工作主目录，主要存放静态文件js、css、html...等公共访问文件，webRoot目录下都可以自定义分配安排，以下只是建议的项目规划
 	      │  │  ├─images 			// (可选) 一些网站所使用的公用图片目录
 	      │  │  ├─js 				// (可选) javascript 文件目录
 	      │  │  └─themes 			// (可选) css主题存放目录，这样做的目的主要是可以方便切换皮肤
