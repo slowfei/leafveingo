@@ -24,7 +24,6 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"github.com/slowfei/gosfcore/log"
-	"github.com/slowfei/gosfcore/utils/strings"
 	"github.com/slowfei/leafveingo/session"
 	"io"
 	"io/ioutil"
@@ -151,7 +150,9 @@ func (ctx *HttpContext) FormTokenJavascript() string {
 	token := session.FormTokenSignature()
 	tokenByte := []byte(token)
 	tblen := len(tokenByte)
+	if 1 == tblen {
 
+	}
 	// 参考：http://www.dynamicdrive.com/emailriddler/
 	// stript := `<script type="text/javascript"></script>`
 
