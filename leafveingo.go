@@ -565,8 +565,8 @@ func (lv *sfLeafvein) AddController(routerKey string, controller interface{}) {
 
 	//	验证添加路由path的规则
 	//	字符串不等于nil || 查询不到"/" || "/" 不在首位
-	if len(router) == 0 || router[0] != '/' {
-		panic(NewLeafveingoError("%T AddController router path error : %v  reference ( \"/\" | \"/Admin/\" )", controller, router))
+	if len(routerKey) == 0 || routerKey[0] != '/' {
+		panic(NewLeafveingoError("%T AddController routerKey path error : %v  reference ( \"/\" | \"/Admin/\" )", controller, routerKey))
 	}
 
 	if nil == controller {
@@ -574,7 +574,7 @@ func (lv *sfLeafvein) AddController(routerKey string, controller interface{}) {
 	}
 
 	refValue := reflect.ValueOf(controller)
-	key := strings.ToLower(router)
+	key := strings.ToLower(routerKey)
 	lv.controllers[key] = refValue
 	lv.controllerKeys = append(lv.controllerKeys, key)
 	sort.Sort(sort.Reverse(SFStringsUtil.SortLengToShort(lv.controllerKeys)))

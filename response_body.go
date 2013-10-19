@@ -73,11 +73,11 @@ func BodyByte(content []byte, contentType string, headers map[string]string) Byt
 //	by template out html, text/html
 //	template path: (templateDir)/(controllerRouter)/(methodName).tpl
 //	e.g.:    URL = http://localhost:8080/index
-//	  key router = "/", method "Index"
+//	  router key = "/", method "Index"
 //	templatePath = (templateDir)/index.tpl
 //
 //			 URL = http://localhost:8080/Admin/index
-//	  key router = "/admin/", method "Index"
+//	  router key = "/admin/", method "Index"
 //	templatePath = (templateDir)/admin/index.tpl
 //
 func BodyTemplate(data interface{}) LVTemplate.TemplateValue {
@@ -99,16 +99,16 @@ func BodyRedirect(url string) Redirect {
 }
 
 //	dispatcher controller
-//	@router 	router key
+//	@routerKey 	router key
 //	@methodName controller method name
-func BodyCellController(router, methodName string) Dispatcher {
-	return Dispatcher{router, methodName, nil}
+func BodyCellController(routerKey, methodName string) Dispatcher {
+	return Dispatcher{routerKey, methodName, nil}
 }
 
 //	dispatcher controller, set headers info
 //	@setHeaders header info
-func BodyCellControllerByHeaders(router, methodName string, setHeaders map[string]string) Dispatcher {
-	return Dispatcher{router, methodName, setHeaders}
+func BodyCellControllerByHeaders(routerKey, methodName string, setHeaders map[string]string) Dispatcher {
+	return Dispatcher{routerKey, methodName, setHeaders}
 }
 
 // out file

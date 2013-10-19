@@ -15,8 +15,8 @@ Leafveingo web framework
 ```
   $GOPATH
 	└─src
-	   └─sample 			// app项目目录
-	      ├─SampleWeb		// app项目名称目录，需要与编译文件同一个目录，这样编译文件就会根据项目名称查找到所需要的文件
+	   └─samplebuild 		// 项目的编译目录(以build为结尾)
+	      ├─sample			// app项目名称目录，需要与编译文件同一个目录，这样编译文件就会根据设置的App名称查找到所需要的文件操作文件
 	      │  ├─template     // 存放模板文件目录
 	      │  ├─webRoot 	  // web工作主目录，主要存放静态文件js、css、html...等公共访问文件，webRoot目录下都可以自定义分配安排，以下只是建议的项目规划
 	      │  │  ├─images 			// (可选) 一些网站所使用的公用图片目录
@@ -75,10 +75,12 @@ func (m *MainController) Index() string {
 }
 
 func main() {
+	//	获取Leafveingo
 	leafvein := leafveingo.SharedLeafvein()
-	// 需要在编译目录下，建立个与AppName一样的目录和webRoot目录，默认名称LeafveingoWeb
+
+	// 需要在项目的编译目录下，建立个与AppName一样的目录和webRoot目录，默认名称LeafveingoWeb
 	// 具体可以看下(开发项目组织结构)
-	leafvein.SetAppName("SampleWeb")
+	leafvein.SetAppName("sample")
 
 	// 原型：AddController(routerKey string, controller interface{})
 
@@ -86,23 +88,10 @@ func main() {
 	
 	//	启动
 	leafvein.Start()
-
-	//	特别说明：URL的访问规则 - AddController("router key",控制器{})
-	//	http://localhost:8080/[控制器router key][控制器函数]
-	//
-	//	URL规则请求例子：
-	//	控制器的函数名 = "User"(默认index)
-	//	router  key  = "/admin"  = http://localhost:8080/adminuser
-	//	router  key  = "/admin/" = http://localhost:8080/admin/user
-	//
-	//	控制器的函数名 = ""(默认index)
-	//	router  key  = "/admin"  = http://localhost:8080/adminindex
-	//	router  key  = "/admin/" = http://localhost:8080/admin/index
-	//	router  key  = "/" 		 = http://localhost:8080/
 }
 
 ```
-go build 编译后运行编译出来的文件，然后在浏览器中打开：`http://localhost:8080/ ` 这样就会默认进入到MainController的Index函数中。
+go build 编译后运行编译出来的文件，然后在浏览器中打开：`http://localhost:8080/` 这样就会默认进入到MainController的Index函数中。
 
 然后浏览器中会输出：Hello world, Leafvingo web framework
 
