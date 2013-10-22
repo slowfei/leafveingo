@@ -41,6 +41,7 @@ const (
 )
 
 var (
+	// private
 	thisTemplate ITemplate
 )
 
@@ -50,6 +51,7 @@ type TemplateValue struct {
 	Data    interface{} //	模板绑定的数据
 }
 
+// 获取模板对象
 func SharedTemplate() ITemplate {
 	if nil == thisTemplate {
 		t := lvtemplate{}
