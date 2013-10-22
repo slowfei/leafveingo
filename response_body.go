@@ -11,12 +11,13 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
+//
+//  Create on 2013-8-24
+//  Update on 2013-10-23
+//  Email  slowfei@foxmail.com
+//  Home   http://www.slowfei.com
 
 //	leafveingo web response返回结果的处理
-//
-//	email	slowfei@foxmail.com
-//	createTime 	2013-8-24
-//	updateTime	2013-10-9
 package leafveingo
 
 import (

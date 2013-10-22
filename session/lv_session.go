@@ -11,6 +11,11 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
+//
+//  Create on 2013-8-24
+//  Update on 2013-10-23
+//  Email  slowfei@foxmail.com
+//  Home   http://www.slowfei.com
 
 //	leafveingo web http session 的封装
 //
@@ -20,10 +25,6 @@
 //		session id 可选随机数生成或IPUUID
 //		自动统计session生成数量、删除数量和有效数量
 //		session token
-//
-//	email	slowfei@foxmail.com
-//	createTime 	2013-8-24
-//	updateTime	2013-10-10
 //
 package LVSession
 
