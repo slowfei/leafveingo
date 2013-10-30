@@ -344,6 +344,9 @@ func (lv *sfLeafvein) initPrivate() {
 	lv.sessionMaxlifeTime = DEFAULT_SESSION_MAX_LIFE_TIME
 	lv.isUseSession = DEFAULT_SESSION_USE
 	lv.isGCSession = DEFAULT_SESSION_GC
+
+	//	开启日志	TODO
+	SFLog.SharedLogManager("")
 }
 
 //	主http响应函数
@@ -493,7 +496,7 @@ func (lv *sfLeafvein) start(startName string) {
 		if _, ok := lv.controllerArcImpls[key]; ok {
 			isArc = "(Implemented AdeRouterController)"
 		}
-		SFLog.Info("\t %v  \t router : %#v  %v\n", value.Type(), key, isArc)
+		SFLog.Info("%v  \t router : %#v  %v\n", value.Type(), key, isArc)
 	}
 
 	//	打印启动信息
