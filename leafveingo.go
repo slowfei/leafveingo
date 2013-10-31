@@ -326,7 +326,7 @@ func (lv *sfLeafvein) initPrivate() {
 	lv.charset = DEFAULT_HTML_CHARSET
 	lv.isRespWriteCompress = DEFAULT_RESPONSE_WRITE_COMPRESS
 	lv.templateSuffix = DEFAULT_TEMPLATE_SUFFIX
-	lv.operatingDir = SFFileManager.GetBuildDir() + "/" + lv.appName + "/"
+	lv.operatingDir = SFFileManager.GetExceDir() + "/" + lv.appName + "/"
 	lv.webRootDir = DEFAULT_WEBROOT_DIR
 
 	lv.templateDir = DEFAULT_TEMPLATE_DIR
@@ -730,7 +730,7 @@ func (lv *sfLeafvein) ServerTimeout() int64 {
 
 func (lv *sfLeafvein) SetAppName(name string) {
 	lv.appName = name
-	lv.operatingDir = SFFileManager.GetBuildDir() + "/" + lv.appName + "/"
+	lv.operatingDir = SFFileManager.GetExceDir() + "/" + lv.appName + "/"
 	//	由于主操作目录改变，模板目录也需要重新设置主目录
 	lv.template.SetBaseDir(lv.TemplateDir())
 }
