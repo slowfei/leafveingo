@@ -44,6 +44,13 @@ func (l *lvtemplate) embedTempate(tplPath string, data interface{}) template.HTM
 
 }
 
+//	string转换成html标签代码
+//	@str
+//	@return
+func (l *lvtemplate) stringToHtml(str string) template.HTML {
+	return template.HTML(str)
+}
+
 //	map类型数据的封装
 //	注意，传递合并的map类型需要是map[string]interface{}，否则会出错
 //	slice值的添加："array" "value1,value2,value3"

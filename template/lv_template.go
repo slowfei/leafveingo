@@ -37,6 +37,7 @@ const (
 	kLVEmbedTempate = "LVEmbedTempate"
 	kLVMapPack      = "LVMapPack"
 	kLVTimeFormat   = "LVTimeFormat"
+	kLVStringToHtml = "LVStringToHtml"
 	kGOVersion      = "GoVersion"
 )
 
@@ -128,6 +129,7 @@ type lvtemplate struct {
 func (l *lvtemplate) initPrivate() {
 	l.funcMap = make(template.FuncMap)
 	l.funcMap[kLVEmbedTempate] = l.embedTempate
+	l.funcMap[kLVStringToHtml] = l.stringToHtml
 	l.funcMap[kLVMapPack] = l.mapPack
 	l.funcMap[kGOVersion] = runtime.Version
 	l.funcMap[kLVTimeFormat] = SFTimeUtil.YMDHMSSFormat
