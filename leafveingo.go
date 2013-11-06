@@ -238,17 +238,10 @@ func SharedLeafvein() ISFLeafvein {
 
 //	default ISFLeafvein interface impl
 type sfLeafvein struct {
-	// application info default LeafveingoWeb
-	appName    string
+	/* 可重新更改参数 */
+
+	//	app version
 	appVersion string
-
-	// server time out, default 0
-	serverTimeout int64
-
-	// default 8080
-	port int
-	// http addr default 127.0.0.1
-	addr string
 
 	// http url suffixs
 	suffixs []string
@@ -266,6 +259,23 @@ type sfLeafvein struct {
 
 	//	file size upload 32M
 	fileUploadSize int64
+
+	//	http session maxlife time, unit second
+	//	default 1800 second(30 minute)
+	sessionMaxlifeTime int32
+
+	/* 需要重新启动程序才能更改参数 */
+
+	// application info default LeafveingoWeb
+	appName string
+
+	// server time out, default 0
+	serverTimeout int64
+
+	// default 8080
+	port int
+	// http addr default 127.0.0.1
+	addr string
 
 	// all controller storage map and router keys
 	controllers    map[string]reflect.Value
@@ -296,10 +306,6 @@ type sfLeafvein struct {
 	sessionManager *LVSession.HttpSessionManager
 	isUseSession   bool // is use session
 	isGCSession    bool // is auto GC session
-
-	//	http session maxlife time, unit second
-	//	default 1800 second(30 minute)
-	sessionMaxlifeTime int32
 
 	/*	private use */
 
@@ -351,6 +357,7 @@ func (lv *sfLeafvein) initPrivate() {
 
 //	主http响应函数
 func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	//	TODO 考虑是否加上读取锁，等测试性能后加上再测试看看。
 
 	var context *HttpContext = nil
 
