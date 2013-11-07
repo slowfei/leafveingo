@@ -218,12 +218,14 @@ func (sm *HttpSessionManager) GetSession(rw http.ResponseWriter, req *http.Reque
 			cookie.Value = signature
 		}
 
-		//	重新设置一次cookie
-		cookie.HttpOnly = true
-		cookie.Secure = sm.CookieSecure
-		cookie.Path = "/"
-		http.SetCookie(rw, cookie)
-		cookie.MaxAge = sm.CookieMaxAge
+		//	如果signature出现修改，则需要重新设置cookie
+		if signatureValue != cookie.Value {
+			cookie.HttpOnly = true
+			cookie.Secure = sm.CookieSecure
+			cookie.Path = "/"
+			http.SetCookie(rw, cookie)
+			cookie.MaxAge = sm.CookieMaxAge
+		}
 
 	} else {
 
@@ -732,16 +734,18 @@ func (s *httpSession) recordIPAccess(ip net.IP) {
 	//	由于防止测试的时候相同的session并发大量涌进，map未初始化不进行操作，
 	//	map初始化的工作交由创建时进行
 	if nil != s.ipRule {
-		s.rwmutex.Lock()
+		//	暂时注释锁的操作，如果按正常一个用户无法并发请求，除非是被攻击。所以注释留着观察。
+		// s.rwmutex.Lock() // TODO
+		// defer s.rwmutex.Unlock()
+
 		key := ip.String()
 		if count, ok := s.ipRule[key]; ok {
 			count++
 			s.ipRule[key] = count
 		} else {
-
 			s.ipRule[ip.String()] = 1
 		}
-		s.rwmutex.Unlock()
+
 	}
 }
 
@@ -803,11 +807,11 @@ func (s *httpSession) FormTokenSignature() string {
 	globalkey := _thisSessionManager.globalTokenKey
 	hashFunc := _thisSessionManager.CookieTokenHash
 
-	s.rwmutex.Lock()
+	// s.rwmutex.Lock() // TODO
 	randToken := make([]byte, randLen)
 	SFRandUtil.RandBits(randToken)
 	index := s.formToken.Add(randToken)
-	s.rwmutex.Unlock()
+	// s.rwmutex.Unlock()
 
 	//	本来是想将index移位或计算到byte[0]头部或尾部的，然后效验时在进行获取，然后还原回原来的byte[0]，
 	//	不过目前还不知道怎么去弄，不知道怎么将index隐藏到byte中。以后等有好的方案再改了。
@@ -832,20 +836,20 @@ func (s *httpSession) FormTokenSignature() string {
 }
 
 func (s *httpSession) Get(key string) (interface{}, bool) {
-	s.rwmutex.RLock()
-	defer s.rwmutex.RUnlock()
+	// s.rwmutex.RLock() // TODO
+	// defer s.rwmutex.RUnlock()
 	v, ok := s.thisMap[key]
 	return v, ok
 }
 
 func (s *httpSession) Set(key string, v interface{}) {
-	s.rwmutex.Lock()
-	defer s.rwmutex.Unlock()
+	// s.rwmutex.Lock() // TODO
+	// defer s.rwmutex.Unlock()
 	s.thisMap[key] = v
 }
 func (s *httpSession) Delete(key string) {
-	s.rwmutex.Lock()
-	defer s.rwmutex.Unlock()
+	// s.rwmutex.Lock() // TODO
+	// defer s.rwmutex.Unlock()
 
 	if _, ok := s.thisMap[key]; ok {
 		delete(s.thisMap, key)
@@ -853,8 +857,8 @@ func (s *httpSession) Delete(key string) {
 }
 
 func (s *httpSession) IPAccessRule() map[string]int {
-	s.rwmutex.RLock()
-	defer s.rwmutex.RUnlock()
+	// s.rwmutex.RLock() // TODO
+	// defer s.rwmutex.RUnlock()
 
 	newMap := make(map[string]int)
 	for k, v := range s.ipRule {
