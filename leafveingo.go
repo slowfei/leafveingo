@@ -35,6 +35,7 @@ import (
 	"net/http"
 	"path"
 	"reflect"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -103,10 +104,14 @@ var (
 	_thisLeafvein ISFLeafvein
 	//	开发模式命令
 	_flagDeveloper bool
+
+	//
+	_rexW = regexp.MustCompile("\\w+")
 )
 
 func init() {
 	flag.BoolVar(&_flagDeveloper, "devel", false, "developer mode start.")
+
 }
 
 //	ISFLeafvein main interface
@@ -307,6 +312,9 @@ type sfLeafvein struct {
 	isUseSession   bool // is use session
 	isGCSession    bool // is auto GC session
 
+	//	log config path
+	logConfPath string
+
 	/*	private use */
 
 	//	http url prefix
@@ -351,7 +359,6 @@ func (lv *sfLeafvein) initPrivate() {
 	lv.isUseSession = DEFAULT_SESSION_USE
 	lv.isGCSession = DEFAULT_SESSION_GC
 
-	//	开启日志	TODO
 	SFLog.SharedLogManager("")
 }
 
@@ -749,12 +756,8 @@ func (lv *sfLeafvein) OperatingDir() string {
 	return lv.operatingDir
 }
 func (lv *sfLeafvein) SetWebRootDir(name string) {
-	if 1 >= len(name) {
-		panic(NewLeafveingoError("set WebRootDir error:%v", name))
-	}
-	name = strings.Replace(name, "/", "", -1)
-	if 0 == len(name) {
-		panic(NewLeafveingoError("set WebRootDir error:%v", name))
+	if !_rexW.MatchString(name) {
+		panic(NewLeafveingoError("set WebRootDir format(a-zA-Z0-9) error:%v", name))
 	}
 
 	lv.webRootDir = name
@@ -764,12 +767,8 @@ func (lv *sfLeafvein) WebRootDir() string {
 }
 
 func (lv *sfLeafvein) SerTemplateDir(name string) {
-	if 1 >= len(name) {
-		panic(NewLeafveingoError("set TemplateDir error:%v", name))
-	}
-	name = strings.Replace(name, "/", "", -1)
-	if 0 == len(name) {
-		panic(NewLeafveingoError("set TemplateDir error:%v", name))
+	if !_rexW.MatchString(name) {
+		panic(NewLeafveingoError("set TemplateDir format(a-zA-Z0-9) error:%v", name))
 	}
 
 	lv.templateDir = name
