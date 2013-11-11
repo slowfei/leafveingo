@@ -98,11 +98,13 @@ type HttpSessionManager struct {
 }
 
 //	get global session manager
+//	@autoGC 是否开启自动清理过期session的操作，如果不开启则需要手动进行GC处理。
 func SharedSessionManager(autoGC bool) *HttpSessionManager {
-	return SharedSessionManagerAtGCTime(DEFAULT_SCAN_GC_TIME, true)
+	return SharedSessionManagerAtGCTime(DEFAULT_SCAN_GC_TIME, autoGC)
 }
 
 // get global session manager test use
+//	@gcTimeSecond 自动GC操作的间隔时间
 func SharedSessionManagerAtGCTime(gcTimeSecond int64, autoGC bool) *HttpSessionManager {
 	if nil == _thisSessionManager {
 		sm := HttpSessionManager{mapSessions: make(map[string]*list.Element), listRank: make(map[int32]*list.List)}
