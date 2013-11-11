@@ -34,6 +34,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"runtime"
@@ -43,32 +44,9 @@ import (
 )
 
 const (
+
 	//	leafveingo version
 	VERSION string = "0.0.1.000"
-	//	default port
-	DEFAULT_PORT int = 8080
-	//	default http addr
-	DEFAULT_HTTP_ADDR = "127.0.0.1"
-	//	file size default upload  32M
-	DEFAULT_FILE_UPLOAD_SIZE int64 = 32 << 20
-	//	server time out default 0
-	DEFAULT_SERVER_TIMEOUT = 0
-	//	default web root dir
-	DEFAULT_WEBROOT_DIR = "webRoot"
-	//	default template dir
-	DEFAULT_TEMPLATE_DIR = "template"
-	//	default template suffix
-	DEFAULT_TEMPLATE_SUFFIX = ".tpl"
-	//	default html charset
-	DEFAULT_HTML_CHARSET = "utf-8"
-	//	default response write compress
-	DEFAULT_RESPONSE_WRITE_COMPRESS = true
-	//	default session max life time 1800 seconds
-	DEFAULT_SESSION_MAX_LIFE_TIME = 1800
-	//	default use session
-	DEFAULT_SESSION_USE = true
-	//	default gc session
-	DEFAULT_SESSION_GC = true
 
 	//	controller default url request ("http://localhost:8080/") method
 	CONTROLLER_DEFAULT_METHOD = "Index"
@@ -161,6 +139,8 @@ type ISFLeafvein interface {
 
 	//	developer mode
 	IsDevel() bool
+	// is starting
+	IsStart() bool
 
 	//	current leafveingo the file operation directory
 	//	operatingDir 是根据 appName 建立的目录路径
@@ -228,6 +208,17 @@ type ISFLeafvein interface {
 	//	custom app version
 	SetAppVersion(version string)
 	AppVersion() string
+
+	//	leafveingo config
+	Config() *Config
+
+	//	log config path
+	LogConfPath() string
+	SetLogConfPath(path string)
+
+	//	log channel size default 5000
+	LogChannelSize() int
+	SetLogChannelSize(size int)
 }
 
 //	使用Leafvein，会将已经初始化好的ISFLeafvein进行同一返回，程序运行只初始化一次
@@ -282,9 +273,38 @@ type sfLeafvein struct {
 	// http addr default 127.0.0.1
 	addr string
 
+	//	web directory, can read and write to the directory
+	//	primary storage html, css, js, image, zip the file
+	webRootDir string
+	//	template dir, storage template file
+	templateDir string
+
+	//	template suffix, default ".tpl"
+	templateSuffix string
+
+	isUseSession bool // is use session
+	isGCSession  bool // is auto GC session
+
+	//	log config path
+	logConfPath string
+	//	log channel size default 5000
+	logChannelSize int
+
+	/* 对象参数 */
+
+	//	application
+	application SFHelper.Map
+
+	//	template
+	template LVTemplate.ITemplate
+
+	//	http session manager
+	sessionManager *LVSession.HttpSessionManager
+
 	// all controller storage map and router keys
 	controllers    map[string]reflect.Value
 	controllerKeys []string
+
 	// AdeRouterController interface storage
 	controllerArcImpls map[string]AdeRouterController
 
@@ -292,28 +312,8 @@ type sfLeafvein struct {
 	//	operatingDir 是根据 appName 建立的目录路径
 	operatingDir string
 
-	//	web directory, can read and write to the directory
-	//	primary storage html, css, js, image, zip the file
-	webRootDir string
-	//	template dir, storage template file
-	templateDir string
-
-	//	template
-	template LVTemplate.ITemplate
-
-	//	template suffix, default ".tpl"
-	templateSuffix string
-
-	//	application
-	application SFHelper.Map
-
-	//	http session manager
-	sessionManager *LVSession.HttpSessionManager
-	isUseSession   bool // is use session
-	isGCSession    bool // is auto GC session
-
-	//	log config path
-	logConfPath string
+	//	leafveingo config
+	config *Config
 
 	/*	private use */
 
@@ -323,43 +323,28 @@ type sfLeafvein struct {
 	listener net.Listener
 	//	developer mode
 	isDevel bool
+	//	is start
+	isStart bool
 }
 
 //	sfLeafvein private init
 func (lv *sfLeafvein) initPrivate() {
 	lv.controllers = make(map[string]reflect.Value)
 	lv.controllerArcImpls = make(map[string]AdeRouterController)
-	lv.port = DEFAULT_PORT
-	lv.fileUploadSize = DEFAULT_FILE_UPLOAD_SIZE
-	lv.serverTimeout = DEFAULT_SERVER_TIMEOUT
-	lv.addr = DEFAULT_HTTP_ADDR
-	lv.SetStaticFileSuffixs(".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html")
-	lv.prefix = ""
-	lv.appName = "LeafveingoWeb"
-	lv.appVersion = "1.0"
-	lv.charset = DEFAULT_HTML_CHARSET
-	lv.isRespWriteCompress = DEFAULT_RESPONSE_WRITE_COMPRESS
-	lv.templateSuffix = DEFAULT_TEMPLATE_SUFFIX
-	lv.operatingDir = SFFileManager.GetExceDir() + "/" + lv.appName + "/"
-	lv.webRootDir = DEFAULT_WEBROOT_DIR
+	lv.isStart = false
 
-	lv.templateDir = DEFAULT_TEMPLATE_DIR
+	lv.config = new(Config)
+	LoadConfigByJson([]byte(_defaultConfigJson), lv.config)
+
+	lv.operatingDir = filepath.Join(SFFileManager.GetExceDir(), lv.appName)
 	lv.template = LVTemplate.SharedTemplate()
 	lv.template.SetBaseDir(lv.TemplateDir())
-	//	由于再模板函数中使用的是interface{}来绑定数据，无法预制是否是map来存储数据就无法嵌入map参数。
-	//	目前使用函数来设置一些Leafvein的内置参数。不知道这样存储有没有坏处，暂时这样先。也许没有变量调用得快。
-	//	需要考虑性能问题？
-	//	考虑好了，还是这样子使用，如果设置map出现多访问的时候就会设置一堆重复的变量，宁愿使用一个全局的好了。
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, lv.Version)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_NAME, lv.AppName)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_VERSION, lv.AppVersion)
 
 	lv.application = SFHelper.NewMap()
-	lv.sessionMaxlifeTime = DEFAULT_SESSION_MAX_LIFE_TIME
-	lv.isUseSession = DEFAULT_SESSION_USE
-	lv.isGCSession = DEFAULT_SESSION_GC
 
-	SFLog.SharedLogManager("")
 }
 
 //	主http响应函数
@@ -519,7 +504,7 @@ func (lv *sfLeafvein) start(startName string) {
 		addr = fmt.Sprintf("%s:%d", lv.addr, lv.port)
 	}
 	if addr == "" {
-		addr = fmt.Sprintf(":%d", DEFAULT_PORT)
+		addr = fmt.Sprintf(":%d", 8080)
 	}
 
 	//	由于addr设置为127.0.0.1的时候就只能允许内网进行http://localhost:(port)/进行访问，本机IP访问不了。
@@ -532,8 +517,10 @@ func (lv *sfLeafvein) start(startName string) {
 
 	if lv.isUseSession {
 		//	自动开启Session GC操作
-		lv.sessionManager = LVSession.SharedSessionManager(true)
+		lv.sessionManager = LVSession.SharedSessionManager(lv.isGCSession)
 	}
+
+	SFLog.StartLogManager(lv.logChannelSize)
 
 	//	设置 server and listen
 	server := &http.Server{
@@ -550,9 +537,11 @@ func (lv *sfLeafvein) start(startName string) {
 		return
 	}
 
+	lv.isStart = true
 	err = server.Serve(lv.listener)
 	if err != nil {
 		SFLog.Fatal("Leafveingo %v Serve: %v \n", startName, err)
+		lv.isStart = false
 	}
 
 }
@@ -629,6 +618,7 @@ func (lv *sfLeafvein) Close() {
 			SFLog.Fatal("%v", err)
 		}
 		SFLog.Info("Leafveingo http://%v:%v closed", lv.addr, lv.port)
+		lv.isStart = false
 	} else {
 		SFLog.Fatal("current http listener nil, can not be closed")
 	}
@@ -636,6 +626,9 @@ func (lv *sfLeafvein) Close() {
 
 func (lv *sfLeafvein) IsDevel() bool {
 	return lv.isDevel
+}
+func (lv *sfLeafvein) IsStart() bool {
+	return lv.isStart
 }
 func (lv *sfLeafvein) Application() SFHelper.Map {
 	return lv.application
@@ -744,7 +737,7 @@ func (lv *sfLeafvein) ServerTimeout() int64 {
 
 func (lv *sfLeafvein) SetAppName(name string) {
 	lv.appName = name
-	lv.operatingDir = SFFileManager.GetExceDir() + "/" + lv.appName + "/"
+	lv.operatingDir = filepath.Join(SFFileManager.GetExceDir(), lv.appName)
 	//	由于主操作目录改变，模板目录也需要重新设置主目录
 	lv.template.SetBaseDir(lv.TemplateDir())
 }
@@ -763,7 +756,7 @@ func (lv *sfLeafvein) SetWebRootDir(name string) {
 	lv.webRootDir = name
 }
 func (lv *sfLeafvein) WebRootDir() string {
-	return lv.operatingDir + lv.webRootDir + "/"
+	return filepath.Join(lv.operatingDir, lv.webRootDir)
 }
 
 func (lv *sfLeafvein) SerTemplateDir(name string) {
@@ -774,7 +767,7 @@ func (lv *sfLeafvein) SerTemplateDir(name string) {
 	lv.templateDir = name
 }
 func (lv *sfLeafvein) TemplateDir() string {
-	return lv.operatingDir + lv.templateDir + "/"
+	return filepath.Join(lv.operatingDir, lv.templateDir)
 }
 
 func (lv *sfLeafvein) SetAppVersion(version string) {
@@ -782,4 +775,19 @@ func (lv *sfLeafvein) SetAppVersion(version string) {
 }
 func (lv *sfLeafvein) AppVersion() string {
 	return lv.appVersion
+}
+func (lv *sfLeafvein) Config() *Config {
+	return lv.config
+}
+func (lv *sfLeafvein) LogConfPath() string {
+	return lv.logConfPath
+}
+func (lv *sfLeafvein) SetLogConfPath(path string) {
+	lv.logConfPath = path
+}
+func (lv *sfLeafvein) LogChannelSize() int {
+	return lv.logChannelSize
+}
+func (lv *sfLeafvein) SetLogChannelSize(size int) {
+	lv.logChannelSize = size
 }
