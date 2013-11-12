@@ -114,7 +114,14 @@ func (c *Config) Get(key string) string {
 
 //	load config
 //	@configPath
-func LoadConfig(configPath string, config *Config) error {
+func loadConfig(configPath string) error {
+	if nil != _thisLeafvein {
+		return errors.New("Leafveingo not initialized.")
+	}
+	if nil == _thisLeafvein.Config() {
+		return errors.New("leafveingo config not initialized.")
+	}
+
 	if 0 != len(configPath) {
 		// _rwmutex.Lock()
 		// defer _rwmutex.Unlock()
@@ -136,7 +143,7 @@ func LoadConfig(configPath string, config *Config) error {
 			return e1
 		}
 
-		e2 := json.Unmarshal(jsonData, config)
+		e2 := json.Unmarshal(jsonData, _thisLeafvein.Config())
 
 		if nil != e2 {
 			return e2
@@ -148,8 +155,16 @@ func LoadConfig(configPath string, config *Config) error {
 
 //	load config
 //	@jsonData
-func LoadConfigByJson(jsonData []byte, config *Config) error {
-	e2 := json.Unmarshal(jsonData, config)
+func loadConfigByJson(jsonData []byte) error {
+	if nil != _thisLeafvein {
+		return errors.New("Leafveingo not initialized.")
+	}
+
+	if nil == _thisLeafvein.Config() {
+		return errors.New("leafveingo config not initialized.")
+	}
+
+	e2 := json.Unmarshal(jsonData, _thisLeafvein.Config())
 	if nil != e2 {
 		return e2
 	}
@@ -173,7 +188,7 @@ func InitLeafvein(configPath string) ISFLeafvein {
 	privatelv.initPrivate()
 
 	if 0 != len(configPath) {
-		LoadConfig(configPath, _thisLeafvein.Config())
+		loadConfig(configPath)
 	} else {
 		fmt.Println("InitLeafvein Failed to load config file: ", configPath)
 		fmt.Println("Use default config info:\n", _defaultConfigJson)
@@ -188,6 +203,7 @@ func setLeafveingoConfig() {
 		cf := _thisLeafvein.Config()
 		if nil != cf {
 			if !_thisLeafvein.IsStart() {
+				//	启动后不能修改的配置信息
 
 				// appName string
 				_thisLeafvein.SetAppName(cf.AppName)

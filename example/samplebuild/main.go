@@ -90,7 +90,7 @@ func main() {
 
 	//	使用配置加载
 	//	"" 空 使用默认配置
-	//	"app.conf"	使用配置文件初始化
+	//	"sample/config/app.conf"	使用配置文件初始化
 	leafvein := LoadConfigInitLeafveingo("sample/config/app.conf")
 
 	//	基本主控制器访问演示

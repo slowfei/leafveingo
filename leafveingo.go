@@ -336,10 +336,9 @@ func (lv *sfLeafvein) initPrivate() {
 	lv.template = LVTemplate.SharedTemplate()
 	lv.application = SFHelper.NewMap()
 	lv.isStart = false
-
 	lv.config = new(Config)
 
-	LoadConfigByJson([]byte(_defaultConfigJson), lv.config)
+	loadConfigByJson([]byte(_defaultConfigJson))
 
 	lv.operatingDir = filepath.Join(SFFileManager.GetExceDir(), lv.appName)
 
