@@ -6,8 +6,10 @@ Leafveingo update log
 ####version 0.0.1.000 rc2
 1. 模版函数
 > * (new) string to html
+
 1. 日志工具
 > * 对日志操作进行了整改
+
 1. 配置文件功能
 > *	增加了leafveingo的配置功能
 
