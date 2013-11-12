@@ -82,9 +82,10 @@ var (
 	_thisLeafvein ISFLeafvein
 	//	开发模式命令
 	_flagDeveloper bool
-
 	//
 	_rexW = regexp.MustCompile("\\w+")
+
+	lvLog = SFLog.NewLogger("Leafveingo")
 )
 
 func init() {
@@ -226,8 +227,9 @@ type ISFLeafvein interface {
 func SharedLeafvein() ISFLeafvein {
 	if nil == _thisLeafvein {
 		var privatelv sfLeafvein = sfLeafvein{}
-		privatelv.initPrivate()
 		_thisLeafvein = &privatelv
+		privatelv.initPrivate()
+
 	}
 	return _thisLeafvein
 }
@@ -331,19 +333,20 @@ type sfLeafvein struct {
 func (lv *sfLeafvein) initPrivate() {
 	lv.controllers = make(map[string]reflect.Value)
 	lv.controllerArcImpls = make(map[string]AdeRouterController)
+	lv.template = LVTemplate.SharedTemplate()
+	lv.application = SFHelper.NewMap()
 	lv.isStart = false
 
 	lv.config = new(Config)
+
 	LoadConfigByJson([]byte(_defaultConfigJson), lv.config)
 
 	lv.operatingDir = filepath.Join(SFFileManager.GetExceDir(), lv.appName)
-	lv.template = LVTemplate.SharedTemplate()
+
 	lv.template.SetBaseDir(lv.TemplateDir())
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, lv.Version)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_NAME, lv.AppName)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_VERSION, lv.AppVersion)
-
-	lv.application = SFHelper.NewMap()
 
 }
 
@@ -384,7 +387,7 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				}
 			}
 
-			SFLog.Error("%v", stack)
+			lvLog.Error("%v", stack)
 		}
 
 		if nil != context {
@@ -413,8 +416,8 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		for _, staticSuffixs := range lv.staticFileSuffixs {
 			if strings.HasSuffix(reqPath, staticSuffixs) {
 				filePath := path.Clean(lv.WebRootDir()) + reqPath
-				var isDir bool
-				if isExists, _ := SFFileManager.Exists(filePath, &isDir); isExists && !isDir {
+
+				if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
 
 					//	处理http.ServeFile函数遇到/index.html被重定向到./的问题
 					if strings.HasSuffix(reqPath, INDEX_PAGE) {
@@ -441,7 +444,7 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		var e error = nil
 		stuctCode, e = lv.cellController(routerKey, methodName, ctrlPath, context)
 		if nil != e {
-			SFLog.Error("%v", e)
+			lvLog.Error("%v", e)
 		}
 	}
 
@@ -470,32 +473,33 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (lv *sfLeafvein) start(startName string) {
+	SFLog.StartLogManager(lv.logChannelSize)
+	SFLog.LoadConfig(lv.logConfPath)
 
-	SFLog.Info("SFLeafvein %v...\n", startName)
+	logInfo := fmt.Sprintf("SFLeafvein %v...\n", startName)
 
 	if 0 == len(lv.controllers) {
-		SFLog.Fatal("Leafveingo %v fatal: Controller == nil \n", startName)
+		lvLog.Fatal("Leafveingo %v fatal: Controller == nil \n", startName)
 		return
 	}
 
 	//	目录检测
-	var isDir bool
-	if isExites, _ := SFFileManager.Exists(lv.operatingDir, &isDir); !isExites && !isDir {
-		SFLog.Warn("not locate the operating directory, will not be able to manipulate files,\n %v \n operation directory is created under the app name directory \n", lv.operatingDir)
-	}
-	isDir = false
-	if isExites, _ := SFFileManager.Exists(lv.WebRootDir(), &isDir); !isExites && !isDir {
-		SFLog.Warn("not locate the %v directory, will not be able to read a static file resource and upload file. \n  need to create directory: %v \n", lv.webRootDir, lv.WebRootDir())
+	if isExites, isDir, _ := SFFileManager.Exists(lv.operatingDir); !isExites || !isDir {
+		lvLog.Warn("not locate the operating directory, will not be able to manipulate files,\n %v \n operation directory is created under the app name directory \n", lv.operatingDir)
 	}
 
-	SFLog.Info("controller:\n")
+	if isExites, isDir, _ := SFFileManager.Exists(lv.WebRootDir()); !isExites || !isDir {
+		lvLog.Warn("not locate the %v directory, will not be able to read a static file resource and upload file. \n  need to create directory: %v \n", lv.webRootDir, lv.WebRootDir())
+	}
+
+	logInfo += "controller:\n"
 	//	打印add的控制器
 	for key, value := range lv.controllers {
 		isArc := ""
 		if _, ok := lv.controllerArcImpls[key]; ok {
 			isArc = "(Implemented AdeRouterController)"
 		}
-		SFLog.Info("%v  \t router : %#v  %v\n", value.Type(), key, isArc)
+		logInfo += fmt.Sprintf("%v  \t router : %#v  %v\n", value.Type(), key, isArc)
 	}
 
 	//	打印启动信息
@@ -510,17 +514,16 @@ func (lv *sfLeafvein) start(startName string) {
 	//	由于addr设置为127.0.0.1的时候就只能允许内网进行http://localhost:(port)/进行访问，本机IP访问不了。
 	//	为了友好的显示，如果addr设置为空的时候允许IP或localhost进行访问做了特别的显示除了（http://0.0.0.0:8080）
 	if strings.Index(addr, ":") == 0 {
-		SFLog.Info("Leafveingo %v to listen on %v. Go to http://0.0.0.0%v \n", startName, lv.port, addr)
+		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://0.0.0.0%v \n\n", startName, lv.port, addr)
 	} else {
-		SFLog.Info("Leafveingo %v to listen on %v. Go to http://%v \n", startName, lv.port, addr)
+		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://%v \n\n", startName, lv.port, addr)
 	}
+	lvLog.Info(logInfo)
 
 	if lv.isUseSession {
 		//	自动开启Session GC操作
 		lv.sessionManager = LVSession.SharedSessionManager(lv.isGCSession)
 	}
-
-	SFLog.StartLogManager(lv.logChannelSize)
 
 	//	设置 server and listen
 	server := &http.Server{
@@ -533,14 +536,14 @@ func (lv *sfLeafvein) start(startName string) {
 	var err error
 	lv.listener, err = net.Listen("tcp", addr)
 	if err != nil {
-		SFLog.Fatal("Leafveingo %v Listen: %v \n", startName, err)
+		lvLog.Fatal("Leafveingo %v Listen: %v \n", startName, err)
 		return
 	}
 
 	lv.isStart = true
 	err = server.Serve(lv.listener)
 	if err != nil {
-		SFLog.Fatal("Leafveingo %v Serve: %v \n", startName, err)
+		lvLog.Fatal("Leafveingo %v Serve: %v \n", startName, err)
 		lv.isStart = false
 	}
 
@@ -615,12 +618,12 @@ func (lv *sfLeafvein) Close() {
 	if nil != lv.listener {
 		err := lv.listener.Close()
 		if nil != err {
-			SFLog.Fatal("%v", err)
+			lvLog.Fatal("%v", err)
 		}
-		SFLog.Info("Leafveingo http://%v:%v closed", lv.addr, lv.port)
+		lvLog.Info("Leafveingo http://%v:%v closed", lv.addr, lv.port)
 		lv.isStart = false
 	} else {
-		SFLog.Fatal("current http listener nil, can not be closed")
+		lvLog.Fatal("current http listener nil, can not be closed")
 	}
 }
 
@@ -653,7 +656,7 @@ func (lv *sfLeafvein) SessionMaxlifeTime() int32 {
 
 func (lv *sfLeafvein) SetHTTPSuffixs(suffixs ...string) {
 	for i, v := range suffixs {
-		if v[0] != '.' {
+		if 0 != len(v) && v[0] != '.' {
 			suffixs[i] = "." + v
 		}
 	}
@@ -665,7 +668,7 @@ func (lv *sfLeafvein) HTTPSuffixs() []string {
 
 func (lv *sfLeafvein) SetStaticFileSuffixs(suffixs ...string) {
 	for i, v := range suffixs {
-		if v[0] != '.' {
+		if 0 != len(v) && v[0] != '.' {
 			suffixs[i] = "." + v
 		}
 	}
@@ -676,7 +679,7 @@ func (lv *sfLeafvein) StaticFileSuffixs() []string {
 }
 
 func (lv *sfLeafvein) SetTemplateSuffix(suffix string) {
-	if suffix[0] != '.' {
+	if 0 != len(suffix) && suffix[0] != '.' {
 		suffix = "." + suffix
 	}
 	lv.templateSuffix = suffix
@@ -736,6 +739,10 @@ func (lv *sfLeafvein) ServerTimeout() int64 {
 }
 
 func (lv *sfLeafvein) SetAppName(name string) {
+	if !_rexW.MatchString(name) {
+		panic(NewLeafveingoError("set AppName format(a-zA-Z0-9) error:%v", name))
+	}
+
 	lv.appName = name
 	lv.operatingDir = filepath.Join(SFFileManager.GetExceDir(), lv.appName)
 	//	由于主操作目录改变，模板目录也需要重新设置主目录
@@ -789,5 +796,7 @@ func (lv *sfLeafvein) LogChannelSize() int {
 	return lv.logChannelSize
 }
 func (lv *sfLeafvein) SetLogChannelSize(size int) {
-	lv.logChannelSize = size
+	if 0 < size {
+		lv.logChannelSize = size
+	}
 }

@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/slowfei/gosfcore/encoding/json"
-	"github.com/slowfei/gosfcore/log"
 	"github.com/slowfei/gosfcore/utils/filemanager"
 	"github.com/slowfei/leafveingo/template"
 	"mime"
@@ -94,19 +93,19 @@ func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context 
 				var e error = nil
 				stuctCode, e = lv.cellController(cvt.Router, cvt.MethodName, dispCtrURLPath, context)
 				if nil != e {
-					SFLog.Error("dispatcher: (%v)controller (%v)method error:%v", ctrlVal.Type().String(), cvt.MethodName, e)
+					lvLog.Error("dispatcher: (%v)controller (%v)method error:%v", ctrlVal.Type().String(), cvt.MethodName, e)
 				}
 			} else {
 				stuctCode = HTTP_STATUS_CODE_500
 				//	这个是自定义写代码的转发，如果查找不到相当于是调用者代码问题，所以直接抛出异常（恐慌）。
-				ErrControllerDispatcherNotFound.Message = SFLog.Error("dispatcher: controller not found router key:%v", cvt.Router)
+				ErrControllerDispatcherNotFound.Message = lvLog.Error("dispatcher: controller not found router key:%v", cvt.Router)
 				panic(ErrControllerDispatcherNotFound)
 			}
 		case ServeFilePath:
 			context.RespWrite.Header().Del("Content-Encoding")
 			filePath := path.Join(lv.WebRootDir(), string(cvt))
-			var isDir bool
-			if isExists, _ := SFFileManager.Exists(filePath, &isDir); isExists && !isDir {
+
+			if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
 				http.ServeFile(context.RespWrite, context.Request, filePath)
 			} else {
 				//	404
@@ -296,7 +295,7 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 	ctrlVal, ok := lv.controllers[routerKey]
 
 	if !ok {
-		err = errors.New(SFLog.Error("cellController not found router key:%v", routerKey))
+		err = errors.New(lvLog.Error("cellController not found router key:%v", routerKey))
 		stuctCode = HTTP_STATUS_CODE_404
 		return
 	}
@@ -354,9 +353,9 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 		if HTTP_STATUS_CODE_200 != stuctCode {
 			return
 		}
-		SFLog.Info("Request controller: %v \n", ctrlVal.Type())
-		SFLog.Info("Request param: %v\n", urlValues)
-		SFLog.Info("Request fileNum: %v\n\n", fileNum)
+
+		logInfo := fmt.Sprintf("Request controller: %s \nRequest param: %v\nRequest fileNum: %d\n\n", ctrlVal.Type(), urlValues, fileNum)
+		lvLog.Info(logInfo)
 
 		isCellCtrMethod := true
 		if isBefore {

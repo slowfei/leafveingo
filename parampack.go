@@ -21,7 +21,6 @@
 package leafveingo
 
 import (
-	"github.com/slowfei/gosfcore/log"
 	"github.com/slowfei/gosfcore/utils/reflect"
 	"net/url"
 	"reflect"
@@ -44,7 +43,7 @@ func (lv *sfLeafvein) filterParamPackStructType(valueType reflect.Type) bool {
 	switch valueType.String() {
 	case "[]multipart.FileHeader", "[]*multipart.FileHeader", "*multipart.FileHeader", "multipart.FileHeader":
 	case "":
-		SFLog.Error("can not read type.String() : %v", valueType)
+		lvLog.Error("can not read type.String() : %v", valueType)
 	default:
 		result = false
 	}

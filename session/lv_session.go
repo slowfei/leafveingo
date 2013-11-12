@@ -73,6 +73,7 @@ var (
 	_ipFilterChar       = strings.NewReplacer("[", "", "]", "")
 	ErrCookieWrite      = errors.New("cookie can not write...")
 	ErrIPValidateFail   = "ip information can not verified :%v"
+	thisLog             = SFLog.NewLogger("LVSession")
 )
 
 //	session manager
@@ -187,7 +188,7 @@ func (sm *HttpSessionManager) GetSession(rw http.ResponseWriter, req *http.Reque
 					//	目前也为了统一使用锁，所以修改session交由updateSessionRank进行。
 					b := sm.updateSessionRank(session, maxlifeTime)
 					if !b {
-						// SFLog.Info("获取session,但是已经被删除了。")
+						// thisLog.Info("获取session,但是已经被删除了。")
 						//	能走到这部表明相同的请求再同一时间请求太多了，导致刚读取到session，然后GC就删除了。
 						//	或则是调用了Invalidate将有效时间设置为-1等待GC删除，这时就需要重新创建请求了
 						isCreateSess = true
@@ -198,7 +199,7 @@ func (sm *HttpSessionManager) GetSession(rw http.ResponseWriter, req *http.Reque
 							session.accessIP = ip
 							session.recordIPAccess(ip)
 						} else {
-							panic(SFLog.Error(ErrIPValidateFail, req.RemoteAddr))
+							panic(thisLog.Error(ErrIPValidateFail, req.RemoteAddr))
 						}
 
 					}
@@ -268,13 +269,13 @@ func (sm *HttpSessionManager) getUUID() (SFUUID.UUID, string) {
 	}
 
 	if nil == uuid {
-		panic(SFLog.Error("session universally unique identifier get error."))
+		panic(thisLog.Error("session universally unique identifier get error."))
 	}
 
 	uuidBase64 := uuid.Base64()
 
 	if sm.Contains(uuidBase64) {
-		panic(SFLog.Error("create uuid appear repeat problem :%v", uuidBase64))
+		panic(thisLog.Error("create uuid appear repeat problem :%v", uuidBase64))
 	}
 
 	return uuid, uuidBase64
@@ -414,7 +415,7 @@ func (sm *HttpSessionManager) createSession(maxlifeTime int32, request *http.Req
 		s.accessIP = ip
 		s.recordIPAccess(ip)
 	} else {
-		panic(SFLog.Error(ErrIPValidateFail, request.RemoteAddr))
+		panic(thisLog.Error(ErrIPValidateFail, request.RemoteAddr))
 	}
 
 	//	寻找@maxlifeTime的列队，如果寻找得到可以直接插入寻找到数列前面
@@ -428,7 +429,7 @@ func (sm *HttpSessionManager) createSession(maxlifeTime int32, request *http.Req
 	newElement := rankList.PushFront(s)
 	sm.mapSessions[s.uid] = newElement
 	if !sm.testing {
-		SFLog.Info("%v: create session id:%v", s.accessIP.String(), s.uid)
+		thisLog.Info("%v: create session id:%v", s.accessIP.String(), s.uid)
 	}
 	sm.sessionCreateNum++
 
@@ -451,7 +452,7 @@ func (sm *HttpSessionManager) updateSessionRank(session *httpSession, mltSecond 
 		//	如果正常请求下很少会进入这里，因为会有个有效时间。然而如果自行进行了销毁，然后该请求又再次进入，不过表示该请求已经是无作为的了。
 		//	输入日志查看IP情况是否是恶意攻击。
 		if !sm.testing {
-			SFLog.Error("%v: update session rank, mapSessions can not find key value. uuid = %v", session.accessIP.String(), session.uid)
+			thisLog.Error("%v: update session rank, mapSessions can not find key value. uuid = %v", session.accessIP.String(), session.uid)
 		}
 		return false
 	}
@@ -601,7 +602,7 @@ func (sm *HttpSessionManager) IsGC() bool {
 //	gc clear session
 func (sm *HttpSessionManager) GC() {
 	startCGTime := time.Now()
-	SFLog.Info("http session GC start :%v", startCGTime)
+	thisLog.Info("http session GC start :%v", startCGTime)
 	isExecuteGC := false
 	delNum := 0
 	sm.rwmutex.Lock()
@@ -657,8 +658,8 @@ func (sm *HttpSessionManager) GC() {
 	sm.isGC = false
 	sm.rwmutex.Unlock()
 	endCGTime := time.Now()
-	SFLog.Info("http session GC end :%v", endCGTime)
-	SFLog.Info("removeNum:%v process time: %v", delNum, endCGTime.Sub(startCGTime))
+	thisLog.Info("http session GC end :%v", endCGTime)
+	thisLog.Info("removeNum:%v process time: %v", delNum, endCGTime.Sub(startCGTime))
 }
 
 //	auto gc clear
@@ -686,7 +687,7 @@ func (sm *HttpSessionManager) SetSIDType(t SIDType, urlIPApi string) {
 		sm.sidType = t
 		SFUUID.SetNetwordIP(urlIPApi)
 	default:
-		panic(SFLog.Error("session id type set error:%v", t))
+		panic(thisLog.Error("session id type set error:%v", t))
 	}
 
 }
@@ -922,7 +923,7 @@ func (f FormToken) Add(b []byte) int {
 
 	//	TODO 按照道理这里因该不会进来，不过如果高并发的话有可能，需要进一步进行测试。
 	if -1 == index {
-		SFLog.Info("FormToken Add if -1 == index")
+		thisLog.Info("FormToken Add if -1 == index")
 		f[0] = b
 		index = 0
 	}

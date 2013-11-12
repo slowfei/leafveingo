@@ -24,7 +24,6 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
-	"github.com/slowfei/gosfcore/log"
 	"github.com/slowfei/leafveingo/session"
 	"io"
 	"io/ioutil"
@@ -82,7 +81,7 @@ func (ctx *HttpContext) closeWriter() {
 		ow.Close()
 	case http.ResponseWriter:
 	default:
-		SFLog.Error("出现未知的压缩数据类型：(%T) 可能没有进行释放.", ow)
+		lvLog.Error("出现未知的压缩数据类型：(%T) 可能没有进行释放.", ow)
 	}
 }
 
@@ -96,7 +95,7 @@ func (ctx *HttpContext) Session(resetToken bool) (LVSession.HttpSession, error) 
 		var sessError error
 		ctx.session, sessError = _thisLeafvein.HttpSessionManager().GetSession(ctx.RespWrite, ctx.Request, _thisLeafvein.SessionMaxlifeTime(), resetToken)
 		if nil != sessError {
-			SFLog.Error("get session error:%v", sessError)
+			lvLog.Error("get session error:%v", sessError)
 			return nil, sessError
 		}
 	}
@@ -204,7 +203,7 @@ func (ctx *HttpContext) RequestBody() []byte {
 		ctx.Request.Body.Close()
 
 		if nil != err {
-			SFLog.Error("request body get error:%v", err)
+			lvLog.Error("request body get error:%v", err)
 			return nil
 		}
 

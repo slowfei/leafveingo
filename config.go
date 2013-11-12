@@ -24,6 +24,7 @@ package leafveingo
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/slowfei/gosfcore/utils/filemanager"
 	"io/ioutil"
@@ -62,25 +63,25 @@ const (
 var (
 	_defaultConfigJson = `
 	{
-		"Port"					:8080,
-		"Addr"					:"127.0.0.1",
-		"ServerTimeout"			:0,
-		"AppName" 				:"LeafveingoWeb",
-		"AppVersion" 			:"1.0",
-		"Suffixs"				:[""],
-		"StaticFileSuffixs"		:[".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"],
-		"Charset"				:"utf-8",
+		"Port"			:8080,
+		"Addr"			:"127.0.0.1",
+		"ServerTimeout"		:0,
+		"AppName"		:"LeafveingoWeb",
+		"AppVersion"		:"1.0",
+		"Suffixs"		:[""],
+		"StaticFileSuffixs"	:[".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"],
+		"Charset"		:"utf-8",
 		"IsRespWriteCompress"	:true,
-		"FileUploadSize"		:33554432,
-		"IsUseSession"			:true,
-		"IsGCSession"			:true,
+		"FileUploadSize"	:33554432,
+		"IsUseSession"		:true,
+		"IsGCSession"		:true,
 		"SessionMaxlifeTime"	:1800,
-		"WebRootDir"			:"webRoot",
-		"TemplateDir"			:"template",
-		"TemplateSuffix"		:".tpl",
-		"LogConfigPath"			:"config/app.conf",
-		"LogChannelSize"		:5000,
-		"UserData"				:{}
+		"WebRootDir"		:"webRoot",
+		"TemplateDir"		:"template",
+		"TemplateSuffix"	:".tpl",
+		"LogConfigPath"		:"config/log.conf",
+		"LogChannelSize"	:5000,
+		"UserData"		:{}
 	}`
 )
 
@@ -103,7 +104,7 @@ type Config struct {
 	TemplateDir         string            // default template dir "template"
 	TemplateSuffix      string            // default template suffix ".tpl"
 	LogConfigPath       string            // default log config path relative path"config/app.conf"
-	LogChannelSize      int64             // default log channel size 5000
+	LogChannelSize      int               // default log channel size 5000
 	UserData            map[string]string //
 }
 
@@ -112,13 +113,25 @@ func (c *Config) Get(key string) string {
 }
 
 //	load config
-//	@filePath
-func LoadConfig(filePath string, config *Config) error {
-	if 0 != len(filePath) {
+//	@configPath
+func LoadConfig(configPath string, config *Config) error {
+	if 0 != len(configPath) {
 		// _rwmutex.Lock()
 		// defer _rwmutex.Unlock()
 
-		jsonData, e1 := ioutil.ReadFile(filePath)
+		var path string
+		if filepath.IsAbs(configPath) {
+			path = configPath
+		} else {
+			path = filepath.Join(SFFileManager.GetExceDir(), configPath)
+		}
+
+		isExists, isDir, _ := SFFileManager.Exists(path)
+		if !isExists || isDir {
+			return errors.New("failed to load configuration file:" + configPath)
+		}
+
+		jsonData, e1 := ioutil.ReadFile(path)
 		if nil != e1 {
 			return e1
 		}
@@ -150,28 +163,21 @@ func LoadConfigByJson(jsonData []byte, config *Config) error {
 //	@configPath 绝对或相对路径，相对路径从执行文件目录开始查找
 //	@return Leafvein的初始化对象，根据配置文件进行配置信息的。
 func InitLeafvein(configPath string) ISFLeafvein {
-	if 0 == len(configPath) {
-		fmt.Println("InitLeafvein config path nil:%v", configPath)
-		return nil
-	}
 	if nil != _thisLeafvein {
 		fmt.Println("Leafveingo Has been initialized.")
 		return _thisLeafvein
 	}
 
-	var path string
-
-	if filepath.IsAbs(configPath) {
-		path = configPath
-	} else {
-		path = filepath.Join(SFFileManager.GetExceDir(), configPath)
-	}
-
 	var privatelv sfLeafvein = sfLeafvein{}
-	privatelv.initPrivate()
 	_thisLeafvein = &privatelv
+	privatelv.initPrivate()
 
-	LoadConfig(path, _thisLeafvein.Config())
+	if 0 != len(configPath) {
+		LoadConfig(configPath, _thisLeafvein.Config())
+	} else {
+		fmt.Println("InitLeafvein Failed to load config file: ", configPath)
+		fmt.Println("Use default config info:\n", _defaultConfigJson)
+	}
 
 	return _thisLeafvein
 }
@@ -229,10 +235,10 @@ func setLeafveingoConfig() {
 			_thisLeafvein.SetAppVersion(cf.AppVersion)
 
 			// http url suffixs
-			_thisLeafvein.SetHTTPSuffixs(cf.Suffixs)
+			_thisLeafvein.SetHTTPSuffixs(cf.Suffixs...)
 
 			// supported static file suffixs
-			_thisLeafvein.SetStaticFileSuffixs(cf.StaticFileSuffixs)
+			_thisLeafvein.SetStaticFileSuffixs(cf.StaticFileSuffixs...)
 
 			// html encode type, charset
 			_thisLeafvein.SetCharset(cf.Charset)

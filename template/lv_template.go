@@ -193,8 +193,7 @@ func (l *lvtemplate) TemplatePathAtName(tplPath string) string {
 		fullPath = path.Join(SFFileManager.GetExceDir(), tplPath)
 	}
 
-	isDir := false
-	if b, _ := SFFileManager.Exists(fullPath, &isDir); b && !isDir {
+	if b, isDir, _ := SFFileManager.Exists(fullPath); b && !isDir {
 		return fullPath
 	}
 

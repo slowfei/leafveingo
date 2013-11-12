@@ -57,7 +57,7 @@
 package leafveingo
 
 import (
-	"github.com/slowfei/gosfcore/log"
+	"fmt"
 	"path"
 	"reflect"
 	"regexp"
@@ -89,7 +89,7 @@ type AdeRouterController interface {
 //	url路由器解析
 //
 func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerKey, methodName, ctrlPath string, stuctCode int) {
-	SFLog.Info(" request url path: %#v", reqPath)
+	logInfo := fmt.Sprintf("request url path: %#v", reqPath)
 
 	//	去除url请求后缀
 	//	/index.go = /index
@@ -110,7 +110,8 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 		if !isSuffix {
 			//	跳转404页面
 			stuctCode = HTTP_STATUS_CODE_404
-			SFLog.Info("Invalid suffix")
+			logInfo += "\nInvalid suffix"
+			lvLog.Info(logInfo)
 			return
 		}
 
@@ -196,7 +197,8 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 		methodName = strings.Title(strings.ToLower(method)) + methodName
 	}
 
-	SFLog.Info("controller   key: %#v   method name: %#v   path: %#v \n", reqPath, methodName, ctrlPath)
+	logInfo += fmt.Sprintf("\ncontroller   key: %#v   method name: %#v   path: %#v \n", reqPath, methodName, ctrlPath)
+	lvLog.Info(logInfo)
 
 	stuctCode = HTTP_STATUS_CODE_200
 	return
