@@ -14,8 +14,13 @@ func (m *MainController) Index() string {
 	return "Hello world, Leafvingo web framework"
 }
 
-func main() {
+//	使用配置文件加载进行配置演示
+func LoadConfigInitLeafveingo(path string) leafveingo.ISFLeafvein {
+	return leafveingo.InitLeafvein(path)
+}
 
+//	手动进行参数设置的演示
+func BaseInitLeafveingo() leafveingo.ISFLeafvein {
 	//	获取Leafveingo
 	leafvein := leafveingo.SharedLeafvein()
 
@@ -32,6 +37,61 @@ func main() {
 
 	//	设置相应输出写入是使用压缩，默认gzip优先，主要看浏览器支持的压缩类型，默认是为true的。
 	leafvein.SetRespWriteCompress(true)
+
+	//	开启或关闭HttpSession, 默认起始时true,这里主要是为了演示
+	leafvein.SetUseSession(true)
+
+	//	演示设置session的最大有效时间，默认30分钟
+	leafvein.SetSessionMaxlifeTime(1800)
+
+	//	演示设置session自动GC操作，自动清理session
+	leafvein.SetGCSession(true)
+
+	//	获取session manager 的演示
+	// leafvein.HttpSessionManager()
+
+	//	设置模板目录名称，目录位于OperatingDir()下而建立的。
+	//	而OperatingDir()是根据AppName()建立的。
+	//	模板目录名称默认就是template
+	leafvein.SerTemplateDir("template")
+
+	//	设置模板后缀，默认是.tpl
+	leafvein.SetTemplateSuffix(".tpl")
+
+	//	其他设置，以下都以默认值再设置一遍，主要为了演示。
+
+	//	webRoot目录
+	leafvein.SetWebRootDir("webRoot")
+
+	//	上传文件大小设置
+	//	最大上传32M
+	leafvein.SetFileUploadSize(32 << 20)
+
+	//	端口设置
+	leafvein.SetPort(8080)
+
+	//	html使用的字符编码
+	leafvein.SetCharset("utf-8")
+
+	//	http 服务请求或响应超时的时间设置，秒为单位，默认0
+	leafvein.SetServerTimeout(0)
+
+	//	请求IP设置，默认为"127.0.0.1" 这样就本机访问，如果局域网或者本机IP访问就需要设置""空
+	//	在服务器上，基本上是使用服务器代理进行转发，所以使用127.0.0.1，不需要IP就可以访问。
+	leafvein.SetAddr("")
+
+	return leafvein
+}
+
+func main() {
+
+	//	使用手动设置参数信息
+	// leafvein := BaseInitLeafveingo()
+
+	//	使用配置加载
+	//	"" 空 使用默认配置
+	//	"app.conf"	使用配置文件初始化
+	leafvein := LoadConfigInitLeafveingo("sample/config/app.conf")
 
 	//	基本主控制器访问演示
 	//	http://localhost:8080/
@@ -72,18 +132,6 @@ func main() {
 	//	http: //localhost:8080/ba/
 	leafvein.AddController("/ba/", BeforeAfterController{})
 
-	//	开启或关闭HttpSession, 默认起始时true,这里主要是为了演示
-	leafvein.SetUseSession(true)
-
-	//	演示设置session的最大有效时间，默认30分钟
-	leafvein.SetSessionMaxlifeTime(1800)
-
-	//	演示设置session自动GC操作，自动清理session
-	leafvein.SetGCSession(true)
-
-	//	获取session manager 的演示
-	// leafvein.HttpSessionManager()
-
 	//	控制器session的演示
 	//	http: //localhost:8080/s/
 	leafvein.AddController("/s/", SessionController{})
@@ -91,36 +139,6 @@ func main() {
 	//	控制器模板演示
 	//	http: //localhost:8080/t/
 	leafvein.AddController("/t/", TemplateController{})
-
-	//	设置模板目录名称，目录位于OperatingDir()下而建立的。
-	//	而OperatingDir()是根据AppName()建立的。
-	//	模板目录名称默认就是template
-	leafvein.SerTemplateDir("template")
-
-	//	设置模板后缀，默认是.tpl
-	leafvein.SetTemplateSuffix(".tpl")
-
-	//	其他设置，以下都以默认值再设置一遍，主要为了演示。
-
-	//	webRoot目录
-	leafvein.SetWebRootDir("webRoot")
-
-	//	上传文件大小设置
-	//	最大上传32M
-	leafvein.SetFileUploadSize(32 << 20)
-
-	//	端口设置
-	leafvein.SetPort(8080)
-
-	//	html使用的字符编码
-	leafvein.SetCharset("utf-8")
-
-	//	http 服务请求或响应超时的时间设置，秒为单位，默认0
-	leafvein.SetServerTimeout(0)
-
-	//	请求IP设置，默认为"127.0.0.1" 这样就本机访问，如果局域网或者本机IP访问就需要设置""空
-	//	在服务器上，基本上是使用服务器代理进行转发，所以使用127.0.0.1，不需要IP就可以访问。
-	leafvein.SetAddr("")
 
 	//	启动
 	leafvein.Start()
