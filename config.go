@@ -115,7 +115,7 @@ func (c *Config) Get(key string) string {
 //	load config
 //	@configPath
 func loadConfig(configPath string) error {
-	if nil != _thisLeafvein {
+	if nil == _thisLeafvein {
 		return errors.New("Leafveingo not initialized.")
 	}
 	if nil == _thisLeafvein.Config() {
@@ -156,7 +156,7 @@ func loadConfig(configPath string) error {
 //	load config
 //	@jsonData
 func loadConfigByJson(jsonData []byte) error {
-	if nil != _thisLeafvein {
+	if nil == _thisLeafvein {
 		return errors.New("Leafveingo not initialized.")
 	}
 
@@ -177,24 +177,23 @@ func loadConfigByJson(jsonData []byte) error {
 //
 //	@configPath 绝对或相对路径，相对路径从执行文件目录开始查找
 //	@return Leafvein的初始化对象，根据配置文件进行配置信息的。
-func InitLeafvein(configPath string) ISFLeafvein {
+func InitLeafvein(configPath string) (ISFLeafvein, error) {
 	if nil != _thisLeafvein {
-		fmt.Println("Leafveingo Has been initialized.")
-		return _thisLeafvein
+		return _thisLeafvein, errors.New("Leafveingo Has been initialized.")
 	}
-
+	var err error = nil
 	var privatelv sfLeafvein = sfLeafvein{}
 	_thisLeafvein = &privatelv
 	privatelv.initPrivate()
 
 	if 0 != len(configPath) {
-		loadConfig(configPath)
+		err = loadConfig(configPath)
 	} else {
 		fmt.Println("InitLeafvein Failed to load config file: ", configPath)
 		fmt.Println("Use default config info:\n", _defaultConfigJson)
 	}
 
-	return _thisLeafvein
+	return _thisLeafvein, err
 }
 
 //	进行配置的设置。
