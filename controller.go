@@ -354,7 +354,7 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 			return
 		}
 
-		logInfo := fmt.Sprintf("Request controller: %s \nRequest param: %v\nRequest fileNum: %d\n\n", ctrlVal.Type(), urlValues, fileNum)
+		logInfo := fmt.Sprintf("Request controller: %s \nRequest param: %v\nRequest fileNum: %d\n", ctrlVal.Type(), urlValues, fileNum)
 		lvLog.Info(logInfo)
 
 		isCellCtrMethod := true

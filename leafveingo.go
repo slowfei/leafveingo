@@ -513,9 +513,9 @@ func (lv *sfLeafvein) start(startName string) {
 	//	由于addr设置为127.0.0.1的时候就只能允许内网进行http://localhost:(port)/进行访问，本机IP访问不了。
 	//	为了友好的显示，如果addr设置为空的时候允许IP或localhost进行访问做了特别的显示除了（http://0.0.0.0:8080）
 	if strings.Index(addr, ":") == 0 {
-		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://0.0.0.0%v \n\n", startName, lv.port, addr)
+		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://0.0.0.0%v \n", startName, lv.port, addr)
 	} else {
-		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://%v \n\n", startName, lv.port, addr)
+		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://%v \n", startName, lv.port, addr)
 	}
 	lvLog.Info(logInfo)
 

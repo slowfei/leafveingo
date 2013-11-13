@@ -44,6 +44,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -602,7 +603,7 @@ func (sm *HttpSessionManager) IsGC() bool {
 //	gc clear session
 func (sm *HttpSessionManager) GC() {
 	startCGTime := time.Now()
-	thisLog.Info("http session GC start :%v", startCGTime)
+	logInfo := "http session GC start :" + startCGTime.String() + "\n"
 	isExecuteGC := false
 	delNum := 0
 	sm.rwmutex.Lock()
@@ -658,8 +659,9 @@ func (sm *HttpSessionManager) GC() {
 	sm.isGC = false
 	sm.rwmutex.Unlock()
 	endCGTime := time.Now()
-	thisLog.Info("http session GC end :%v", endCGTime)
-	thisLog.Info("removeNum:%v process time: %v", delNum, endCGTime.Sub(startCGTime))
+	logInfo += "http session GC end :" + endCGTime.String() + "\n"
+	logInfo += "removeNum:" + strconv.Itoa(delNum) + " process time:" + endCGTime.Sub(startCGTime).String() + "\n"
+	thisLog.Info(logInfo)
 }
 
 //	auto gc clear
