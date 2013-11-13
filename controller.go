@@ -37,8 +37,8 @@ import (
 )
 
 //	控制器返回参数处理
-func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context *HttpContext) (stuctCode int, err error) {
-	stuctCode = HTTP_STATUS_CODE_200
+func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context *HttpContext) (stuctCode HttpStatus, err error) {
+	stuctCode = Status200
 
 	if 1 == len(v) {
 		rv := reflect.Indirect(v[0])
@@ -46,7 +46,7 @@ func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context 
 		switch cvt := rv.Interface().(type) {
 		case string:
 			context.RespWrite.Header().Set("Content-Type", "text/plain; charset="+lv.charset)
-			context.RespBodyWrite([]byte(cvt), HTTP_STATUS_CODE_200)
+			context.RespBodyWrite([]byte(cvt), Status200)
 		case ByteOut:
 			if 0 == len(cvt.ContentType) {
 				context.RespWrite.Header().Set("Content-Type", "text/plain; charset="+lv.charset)
@@ -56,13 +56,13 @@ func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context 
 			for k, v := range cvt.Headers {
 				context.RespWrite.Header().Set(k, v)
 			}
-			context.RespBodyWrite(cvt.Body, HTTP_STATUS_CODE_200)
+			context.RespBodyWrite(cvt.Body, Status200)
 		case SFJson.Json:
 			context.RespWrite.Header().Set("Content-Type", "application/json")
-			context.RespBodyWrite(cvt.Byte(), HTTP_STATUS_CODE_200)
+			context.RespBodyWrite(cvt.Byte(), Status200)
 		case HtmlOut:
 			context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.charset)
-			context.RespBodyWrite([]byte(cvt), HTTP_STATUS_CODE_200)
+			context.RespBodyWrite([]byte(cvt), Status200)
 		case LVTemplate.TemplateValue:
 			context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.charset)
 			if "" == cvt.TplPath {
@@ -74,8 +74,8 @@ func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context 
 			}
 		case Redirect:
 			context.RespWrite.Header().Del("Content-Encoding")
-			http.Redirect(context.RespWrite, context.Request, string(cvt), HTTP_STATUS_CODE_301)
-			stuctCode = HTTP_STATUS_CODE_301
+			http.Redirect(context.RespWrite, context.Request, string(cvt), int(Status301))
+			stuctCode = Status301
 		case Dispatcher:
 			if 0 == len(cvt.MethodName) {
 				cvt.MethodName = CONTROLLER_DEFAULT_METHOD
@@ -96,7 +96,7 @@ func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context 
 					lvLog.Error("dispatcher: (%v)controller (%v)method error:%v", ctrlVal.Type().String(), cvt.MethodName, e)
 				}
 			} else {
-				stuctCode = HTTP_STATUS_CODE_500
+				stuctCode = Status500
 				//	这个是自定义写代码的转发，如果查找不到相当于是调用者代码问题，所以直接抛出异常（恐慌）。
 				ErrControllerDispatcherNotFound.Message = lvLog.Error("dispatcher: controller not found router key:%v", cvt.Router)
 				panic(ErrControllerDispatcherNotFound)
@@ -129,7 +129,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 	files map[string][]*multipart.FileHeader,
 	fileNum int,
 	err error,
-	stuctCode int) {
+	stuctCode HttpStatus) {
 
 	switch req.Method {
 	case "GET":
@@ -139,7 +139,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 		enctype, _, e := mime.ParseMediaType(contentType)
 		if nil != e {
 			err = e
-			stuctCode = HTTP_STATUS_CODE_400
+			stuctCode = Status400
 			return
 		}
 
@@ -147,7 +147,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 		case enctype == "application/x-www-form-urlencoded":
 			err = req.ParseForm()
 			if nil != err {
-				stuctCode = HTTP_STATUS_CODE_400
+				stuctCode = Status400
 				return
 			}
 
@@ -157,7 +157,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 		case enctype == "multipart/form-data":
 			err = req.ParseMultipartForm(lv.fileUploadSize)
 			if nil != err {
-				stuctCode = HTTP_STATUS_CODE_400
+				stuctCode = Status400
 				return
 			}
 			// ParseMultipartForm()解析已经调用了ParseForm()
@@ -182,7 +182,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 		urlValues = make(url.Values)
 	}
 
-	stuctCode = HTTP_STATUS_CODE_200
+	stuctCode = Status200
 	return
 }
 
@@ -291,12 +291,12 @@ func (lv *sfLeafvein) cellMethod(
 //	@ctrURLPath		控制器url路径
 //	@rw
 //	@req
-func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, context *HttpContext) (stuctCode int, err error) {
+func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, context *HttpContext) (stuctCode HttpStatus, err error) {
 	ctrlVal, ok := lv.controllers[routerKey]
 
 	if !ok {
 		err = errors.New(lvLog.Error("cellController not found router key:%v", routerKey))
-		stuctCode = HTTP_STATUS_CODE_404
+		stuctCode = Status404
 		return
 	}
 
@@ -336,7 +336,7 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 
 	} else {
 		err = errors.New(fmt.Sprintf("cellController not found method name:%v", methodName))
-		stuctCode = HTTP_STATUS_CODE_404
+		stuctCode = Status404
 		return
 	}
 
@@ -350,7 +350,7 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 		fileNum := 0
 
 		urlValues, files, fileNum, err, stuctCode = lv.parseFormParams(context.Request)
-		if HTTP_STATUS_CODE_200 != stuctCode {
+		if Status200 != stuctCode {
 			return
 		}
 
@@ -375,7 +375,7 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 			stuctCode, err = lv.returnValue(rvs, ctrlPath, context)
 		} else {
 			//	请求拒绝
-			stuctCode = HTTP_STATUS_CODE_403
+			stuctCode = Status403
 			//	error info is return?
 		}
 

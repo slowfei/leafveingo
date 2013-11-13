@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/slowfei/leafveingo"
 	. "github.com/slowfei/leafveingo/example/samplebuild/src/controllers"
 )
@@ -17,11 +16,7 @@ func (m *MainController) Index() string {
 
 //	使用配置文件加载进行配置演示
 func LoadConfigInitLeafveingo(path string) leafveingo.ISFLeafvein {
-	l, e := leafveingo.InitLeafvein(path)
-	if nil != e {
-		fmt.Println(e)
-	}
-	return l
+	return leafveingo.InitLeafvein(path)
 }
 
 //	手动进行参数设置的演示

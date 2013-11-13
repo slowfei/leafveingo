@@ -81,16 +81,20 @@ func (ctx *HttpContext) closeWriter() {
 		ow.Close()
 	case http.ResponseWriter:
 	default:
-		lvLog.Error("出现未知的压缩数据类型：(%T) 可能没有进行释放.", ow)
+		lvLog.Debug("出现未知的压缩数据类型：(%T) 可能没有进行释放.", ow)
 	}
 }
 
 //	get session, context the only session
 //	@resetToken is reset session token
 func (ctx *HttpContext) Session(resetToken bool) (LVSession.HttpSession, error) {
+	if nil == _thisLeafvein {
+		return nil, ErrLeafveingoNotInit
+	}
 	if nil == _thisLeafvein.HttpSessionManager() {
 		return nil, ErrHttpSessionManagerClosed
 	}
+
 	if nil == ctx.session {
 		var sessError error
 		ctx.session, sessError = _thisLeafvein.HttpSessionManager().GetSession(ctx.RespWrite, ctx.Request, _thisLeafvein.SessionMaxlifeTime(), resetToken)
@@ -232,16 +236,16 @@ func (ctx *HttpContext) MethodNames() []string {
 
 //	response comperss write
 // 会根据Accept-Encoding支持的格式进行压缩，优先gzip
-func (ctx *HttpContext) RespBodyWrite(body []byte, code int) {
+func (ctx *HttpContext) RespBodyWrite(body []byte, code HttpStatus) {
 	ctx.RespWrite.Header().Set("Content-Encoding", ctx.contentEncoding)
-	ctx.RespWrite.WriteHeader(code)
+	ctx.RespWrite.WriteHeader(int(code))
 	ctx.comperssWriter.Write(body)
 }
 
 //  response not comperss write Content-Encoding = none
-func (ctx *HttpContext) RespBodyWriteNotComperss(body []byte, code int) {
+func (ctx *HttpContext) RespBodyWriteNotComperss(body []byte, code HttpStatus) {
 	ctx.RespWrite.Header().Set("Content-Encoding", "none")
-	ctx.RespWrite.WriteHeader(code)
+	ctx.RespWrite.WriteHeader(int(code))
 	ctx.RespWrite.Write(body)
 }
 
@@ -249,4 +253,21 @@ func (ctx *HttpContext) RespBodyWriteNotComperss(body []byte, code int) {
 func (ctx *HttpContext) ComperssWriter() io.Writer {
 	ctx.RespWrite.Header().Set("Content-Encoding", ctx.contentEncoding)
 	return ctx.comperssWriter
+}
+
+//	status page write
+func (ctx *HttpContext) StatusPageWrite(status HttpStatus, msg, error, stack string) error {
+	if nil == _thisLeafvein {
+		return ErrLeafveingoNotInit
+	}
+	ctx.RespWrite.Header().Set("Content-Type", "text/html; charset="+_thisLeafvein.Charset())
+	ctx.RespWrite.WriteHeader(int(status))
+	err := _thisLeafvein.statusPage(ctx.ComperssWriter(), NewHttpStatusValue(status, msg, error, stack))
+
+	if nil != err {
+		lvLog.Error(err.Error())
+		return err
+	}
+
+	return nil
 }

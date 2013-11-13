@@ -33,6 +33,15 @@ var (
 
 	//转发找不到控制器
 	ErrControllerDispatcherNotFound = NewLeafveingoError("dispatcher: controller not found router key:")
+
+	//	Leafveingo 没有进行初始化
+	ErrLeafveingoNotInit = NewLeafveingoError("Leafveingo not initialized.")
+
+	//	Leafveingo 已经初始化
+	ErrLeafveingoHasbeenInit = NewLeafveingoError("Leafveingo Has been initialized.")
+
+	//	Leafveingo 配置对象未初始化
+	ErrLeafveingoConfigNotInit = NewLeafveingoError("Leafveingo config not initialized.")
 )
 
 //	leafveingo error

@@ -31,6 +31,7 @@ import (
 	"github.com/slowfei/gosfcore/utils/strings"
 	"github.com/slowfei/leafveingo/session"
 	"github.com/slowfei/leafveingo/template"
+	"io"
 	"net"
 	"net/http"
 	"path"
@@ -60,21 +61,11 @@ const (
 	TEMPLATE_FUNC_KEY_VERSION     = "Leafveingo_version"
 	TEMPLATE_FUNC_KEY_APP_VERSION = "Leafveingo_app_version"
 	TEMPLATE_FUNC_KEY_APP_NAME    = "Leafveingo_app_name"
+	TEMPLATE_FUNC_KEY_IS_DEVEL    = "Leafveingo_devel"
 
 	//	不知道为什么golang使用http.ServeFile判断为此结尾就重定向到/index.html中。
 	//	这里定义主要用来解决这个问题的处理
 	INDEX_PAGE = "/index.html"
-
-	//	http status support code
-	//	http://zh.wikipedia.org/wiki/HTTP%E7%8A%B6%E6%80%81%E7%A0%81
-	HTTP_STATUS_CODE_200 = 200
-	HTTP_STATUS_CODE_301 = 301
-	HTTP_STATUS_CODE_307 = 307
-	HTTP_STATUS_CODE_400 = 400
-	HTTP_STATUS_CODE_404 = 404
-	HTTP_STATUS_CODE_403 = 403
-	HTTP_STATUS_CODE_500 = 500
-	HTTP_STATUS_CODE_503 = 503
 )
 
 var (
@@ -220,6 +211,11 @@ type ISFLeafvein interface {
 	//	log channel size default 5000
 	LogChannelSize() int
 	SetLogChannelSize(size int)
+
+	/* private method*/
+
+	//	状态页面输出
+	statusPage(wr io.Writer, value HttpStatusValue) error
 }
 
 //	使用Leafvein，会将已经初始化好的ISFLeafvein进行同一返回，程序运行只初始化一次
@@ -346,6 +342,7 @@ func (lv *sfLeafvein) initPrivate() {
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, lv.Version)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_NAME, lv.AppName)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_VERSION, lv.AppVersion)
+	lv.template.SetFunc(TEMPLATE_FUNC_KEY_IS_DEVEL, lv.isDevel)
 
 }
 
@@ -357,7 +354,8 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	defer func() {
 		if err := recover(); err != nil {
-			var stack string = fmt.Sprintln(err)
+			errStr := fmt.Sprintln(err)
+			var stack string = errStr
 			for i := 2; ; i++ {
 				pc, file, line, ok := runtime.Caller(i)
 				if !ok {
@@ -369,20 +367,19 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 			stack = stack + fmt.Sprintf("\n-----------------------------\nleafveiongo version:%v \ngolang version: %v", lv.Version(), runtime.Version())
 
-			//	暂时字符输出，到时候更改模板
-			const ErrorCode500String = "error code 500"
+			//	暂时字符输出，到时候更改模板TODO
+			const ErrorCode500String = "Internal Server Error"
 			if nil != context {
-				rw.Header().Set("Content-Type", "text/plain; charset="+lv.charset)
 				if lv.isDevel {
-					context.RespBodyWrite([]byte(stack), HTTP_STATUS_CODE_500)
+					context.StatusPageWrite(Status500, ErrorCode500String, errStr, stack)
 				} else {
-					context.RespBodyWrite([]byte(ErrorCode500String), HTTP_STATUS_CODE_500)
+					context.StatusPageWrite(Status500, ErrorCode500String, "", "")
 				}
 			} else {
 				if lv.isDevel {
-					http.Error(rw, stack, HTTP_STATUS_CODE_500)
+					lv.statusPage(rw, NewHttpStatusValue(Status500, ErrorCode500String, errStr, stack))
 				} else {
-					http.Error(rw, ErrorCode500String, HTTP_STATUS_CODE_500)
+					lv.statusPage(rw, NewHttpStatusValue(Status500, ErrorCode500String, "", ""))
 				}
 			}
 
@@ -439,7 +436,7 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	routerKey, methodName, ctrlPath, stuctCode := lv.routerParse(reqPath, context)
 
-	if HTTP_STATUS_CODE_200 == stuctCode {
+	if Status200 == stuctCode {
 		var e error = nil
 		stuctCode, e = lv.cellController(routerKey, methodName, ctrlPath, context)
 		if nil != e {
@@ -448,25 +445,25 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	switch stuctCode {
-	case HTTP_STATUS_CODE_200, HTTP_STATUS_CODE_301, HTTP_STATUS_CODE_307:
+	case Status200, Status301, Status307:
 		//	不做处理的代码
 
-	//	暂时不处理这些错误代码 TODO
-	// case HTTP_STATUS_CODE_503:
-	// case HTTP_STATUS_CODE_500:
-	// case HTTP_STATUS_CODE_400:
-	case HTTP_STATUS_CODE_403:
-		const ErrorCode404String = "403 Forbidden The server understood the request"
-		rw.Header().Set("Content-Type", "text/plain; charset="+lv.charset)
-		context.RespBodyWrite([]byte(ErrorCode404String), HTTP_STATUS_CODE_403)
-	// case HTTP_STATUS_CODE_404:
-	// 	http.NotFound(rw, req)
+	case Status400:
+		const ErrorCode400String = "Bad Request"
+		context.StatusPageWrite(stuctCode, ErrorCode400String, "", "")
+	case Status403:
+		const ErrorCode403String = "Forbidden The server understood the request"
+		context.StatusPageWrite(stuctCode, ErrorCode403String, "", "")
+	case Status500:
+		const ErrorCode500String = "Internal Server Error"
+		context.StatusPageWrite(stuctCode, ErrorCode500String, "", "")
+	case Status503:
+		const ErrorCode503String = "Service Unavailable"
+		context.StatusPageWrite(stuctCode, ErrorCode503String, "", "")
 	default:
 		//	默认跳转404
-		const ErrorCode404String = "404 page not found"
-		rw.Header().Set("Content-Type", "text/plain; charset="+lv.charset)
-		context.RespBodyWrite([]byte(ErrorCode404String), HTTP_STATUS_CODE_404)
-
+		const ErrorCode404String = "page not found"
+		context.StatusPageWrite(stuctCode, ErrorCode404String, "", "")
 	}
 
 }

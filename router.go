@@ -88,7 +88,7 @@ type AdeRouterController interface {
 
 //	url路由器解析
 //
-func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerKey, methodName, ctrlPath string, stuctCode int) {
+func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerKey, methodName, ctrlPath string, stuctCode HttpStatus) {
 	logInfo := fmt.Sprintf("request url path: %#v", reqPath)
 
 	//	去除url请求后缀
@@ -109,7 +109,7 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 		}
 		if !isSuffix {
 			//	跳转404页面
-			stuctCode = HTTP_STATUS_CODE_404
+			stuctCode = Status404
 			logInfo += "\nInvalid suffix"
 			lvLog.Info(logInfo)
 			return
@@ -152,7 +152,7 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 
 				if 0 == len(methodName) {
 					//	404
-					stuctCode = HTTP_STATUS_CODE_404
+					stuctCode = Status404
 					return
 				}
 
@@ -176,7 +176,7 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 			//	匹配函数名是否正确
 			if !_rexValidMethodName.MatchString(methodName) {
 				//	404
-				stuctCode = HTTP_STATUS_CODE_404
+				stuctCode = Status404
 				return
 			} else {
 				//	控制器的函数名称将首字母转换成大写
@@ -200,7 +200,7 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 	logInfo += fmt.Sprintf("\ncontroller   key: %#v   method name: %#v   path: %#v \n", reqPath, methodName, ctrlPath)
 	lvLog.Info(logInfo)
 
-	stuctCode = HTTP_STATUS_CODE_200
+	stuctCode = Status200
 	return
 
 }

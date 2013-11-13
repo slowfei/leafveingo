@@ -108,6 +108,13 @@ type ITemplate interface {
 	//	@return
 	Parse(tplPath string) (*template.Template, error)
 
+	//	解析模板，根据内容进行解析，注意，这里不是模版路径，是模版内容
+	//
+	//	@name	模版名称，名称需要是唯一的。否则可能旧的会被覆盖
+	//	@src	模版内容
+	//	@return
+	ParseString(name, src string) (*template.Template, error)
+
 	//	根据模板相对路径获取模板，如果查询不到返回 nil
 	//	@tplPath	模板的相对路径
 	Get(tplPath string) *template.Template
@@ -174,23 +181,41 @@ func (l *lvtemplate) Parse(tplPath string) (*template.Template, error) {
 
 }
 
+func (l *lvtemplate) ParseString(name, src string) (*template.Template, error) {
+	var tmpl *template.Template
+	if l.isCache {
+		if tmpl = l.goTemplate.Lookup(name); nil != tmpl {
+			return tmpl, nil
+		}
+		tmpl = l.goTemplate.New(name)
+	} else {
+		tmpl = template.New(name)
+	}
+
+	tmpl.Funcs(l.funcMap)
+	if _, err := tmpl.Parse(src); nil != err {
+		return nil, err
+	}
+	return tmpl, nil
+
+}
+
 func (l *lvtemplate) Execute(wr io.Writer, value TemplateValue) error {
 	tmpl, err := l.Parse(value.TplPath)
 	if nil == err && nil != tmpl {
-		tmpl.Execute(wr, value.Data)
-		return nil
+		return tmpl.Execute(wr, value.Data)
 	} else {
 		return err
 	}
 }
 
-func (l *lvtemplate) TemplatePathAtName(tplPath string) string {
+func (l *lvtemplate) TemplatePathAtName(tplName string) string {
 	var fullPath string
 
 	if 0 < len(l.baseDir) {
-		fullPath = path.Join(l.baseDir, tplPath)
+		fullPath = path.Join(l.baseDir, tplName)
 	} else {
-		fullPath = path.Join(SFFileManager.GetExceDir(), tplPath)
+		fullPath = path.Join(SFFileManager.GetExceDir(), tplName)
 	}
 
 	if b, isDir, _ := SFFileManager.Exists(fullPath); b && !isDir {
