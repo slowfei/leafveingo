@@ -21,8 +21,9 @@
 package leafveingo
 
 import (
-	"fmt"
 	"io"
+	"net/http"
+	"strconv"
 )
 
 const (
@@ -30,17 +31,17 @@ const (
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>Error {{status}}</title>
-	<style>html{height:101%}body{padding:0;margin:0;font-size:14px;font-family:Microsoft YaHei,"微软雅黑",Lucida,Verdana,Hiragino Sans GB,STHeiti,WenQuanYi Micro Hei,SimSun,sans-serif;}.status{background-color:#000;text-align:center;padding-bottom:10px;color:#fff;}.status a{color:#FF5F00;}.status a:hover{color:#fff;}h1{padding:10px 10px;margin:0px 0px;font-size:128px;}.stack{color:red;margin:0px 30px;}.error{margin:20px 30px;font-weight:bold;color:red;}.footer{text-align:center;position:absolute;bottom:0px;height:90px;clear:both;width:100%;}.footer div{text-align:center;margin:5px 0px;}</style>
+	<title>Error {{.status}}</title>
+	<style>html{height:101%}body{padding:0;margin:0;font-size:14px;font-family:Microsoft YaHei,"微软雅黑",Lucida,Verdana,Hiragino Sans GB,STHeiti,WenQuanYi Micro Hei,SimSun,sans-serif;}pre{white-space:pre-wrap;white-space:-moz-pre-wrap;white-space:-pre-wrap;white-space:-o-pre-wrap;word-wrap:break-word;font-size:14px;margin:3px 3px;}.status{background-color:#000;text-align:center;padding-bottom:10px;color:#fff;}.status a{color:#FF5F00;}.status a:hover{color:#fff;}h1{padding:10px 10px;margin:0px 0px;font-size:128px;}.stack{color:red;margin:0px 30px;}.error{margin:20px 30px;font-weight:bold;color:red;}.footer{text-align:center;position:absolute;bottom:0px;height:90px;clear:both;width:100%;}.footer div{text-align:center;margin:5px 0px;}</style>
 </head>
 <body>
 	<div class="status">
-		<h1>{{status}}</h1>
-		<h3>{{msg}}</h3>
+		<h1>{{.status}}</h1>
+		<h3>{{.msg}}</h3>
 		<a href="javascript:window.history.back();" title="Back to site">Back</a>
 	</div>
-	<div class="error">{{error}}</div>
-	<div class="stack"><pre>{{stack}}</pre></div>
+	<div class="error">{{.error}}</div>
+	<div class="stack"><pre>{{.stack}}</pre></div>
 	<div class="footer"> 
 		<div>{{Leafveingo_app_name}} Version {{Leafveingo_app_version}}</div>
 		<div>Leafveingo Version {{Leafveingo_version}}</div>
@@ -48,6 +49,14 @@ const (
 	</div>
 </body>
 </html>`
+
+	Status301Msg = "Moved Permanently"
+	Status307Msg = "Temporary Redirect"
+	Status400Msg = "Bad Request"
+	Status403Msg = "Forbidden The server understood the request"
+	Status404Msg = "Page Not Found"
+	Status500Msg = "Internal Server Error"
+	Status503Msg = "Service Unavailable"
 )
 
 var (
@@ -68,24 +77,68 @@ type HttpStatus int16
 
 //	数据的封装
 type HttpStatusValue struct {
-	status HttpStatus // status code
-	msg    string     //
-	error  string     //
-	stack  string     //
+	status HttpStatus        // status code
+	data   map[string]string //
 }
 
 //	new status value
 func NewHttpStatusValue(status HttpStatus, msg, error, stack string) HttpStatusValue {
-	return HttpStatusValue{status, msg, error, stack}
+
+	data := make(map[string]string)
+	data["msg"] = msg
+	data["error"] = error
+	data["stack"] = stack
+	data["status"] = strconv.Itoa(int(status))
+
+	return HttpStatusValue{status, data}
 }
 
-//	out http status page info
+//	根据状态获取相应的字符串信息
+//
+//	@status
+//	@return
+func StatusMsg(status HttpStatus) string {
+	msg := ""
+	switch status {
+	case Status200:
+		msg = "ok"
+	case Status301:
+		msg = Status301Msg
+	case Status307:
+		msg = Status307Msg
+	case Status400:
+		msg = Status400Msg
+	case Status403:
+		msg = Status403Msg
+	case Status404:
+		msg = Status404Msg
+	case Status500:
+		msg = Status500Msg
+	case Status503:
+		msg = Status503Msg
+	}
+	return msg
+}
+
+//	status page response writer set content-type and header code
+//	不使用压缩的输出的
+//	@rw
+//	@value
+func (lv *sfLeafvein) statusPageWriter(rw http.ResponseWriter, value HttpStatusValue) error {
+	rw.Header().Set("Content-Encoding", "none")
+	rw.Header().Set("Content-Type", "text/html; charset="+lv.charset)
+	rw.WriteHeader(int(value.status))
+	return lv.statusPageExecute(rw, value)
+}
+
+//	status page template execute
 //	@wr
 //	@value
-func (lv *sfLeafvein) statusPage(wr io.Writer, value HttpStatusValue) error {
+func (lv *sfLeafvein) statusPageExecute(wr io.Writer, value HttpStatusValue) error {
+	status := strconv.Itoa(int(value.status))
 
 	//	根据状态代码先查找模版，直接查找模版的根目录
-	tplName := fmt.Sprintf("%d%s", value.status, lv.templateSuffix)
+	tplName := status + lv.templateSuffix
 
 	tmpl, err := lv.template.Parse(tplName)
 
@@ -97,10 +150,5 @@ func (lv *sfLeafvein) statusPage(wr io.Writer, value HttpStatusValue) error {
 		}
 	}
 
-	data := make(map[string]string)
-	data["msg"] = value.msg
-	data["error"] = value.error
-	data["stack"] = value.stack
-
-	return tmpl.Execute(wr, data)
+	return tmpl.Execute(wr, value.data)
 }

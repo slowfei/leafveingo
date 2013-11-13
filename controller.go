@@ -63,6 +63,11 @@ func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context 
 		case HtmlOut:
 			context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.charset)
 			context.RespBodyWrite([]byte(cvt), Status200)
+		case HttpStatusValue:
+			err := context.StatusPageWriteByValue(cvt)
+			if nil != err {
+				lvLog.Debug(err.Error())
+			}
 		case LVTemplate.TemplateValue:
 			context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.charset)
 			if "" == cvt.TplPath {

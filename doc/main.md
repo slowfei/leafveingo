@@ -112,6 +112,7 @@ go build 编译后运行编译出来的文件，然后在浏览器中打开：`h
 >1. [模板](07.md)
 >1. [日志工具](08.md)
 >1. [配置文件](09.md)
+>1. [状态页](10.md)
 
 ##
 #### 使用协议 [LICENSE](https://github.com/slowfei/leafveingo/blob/master/LICENSE)

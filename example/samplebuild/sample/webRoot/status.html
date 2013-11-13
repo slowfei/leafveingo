@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>StatusController</title>
+	<link rel="stylesheet" href="/themes/core/core.css">
+	<link rel="stylesheet" href="/themes/default/css/style.css">
+</head>
+<body>
+	<h1>状态页演示操作</h1>
+	
+	<a href="/sp/s500.htm">http://localhost:8080/sp/s500.htm</a>
+	<br/>
+<pre>
+//	500错误
+func (s *StatusController) S500() {
+	panic("500 error...")
+}
+</pre>
+	<br/>
+
+	<a href="/sp/s403.htm">http://localhost:8080/sp/s403.htm</a>
+	<br/>
+<pre>
+//	自定义403模版
+func (s *StatusController) S403() HttpStatusValue {
+	//	github.com/slowfei/leafveingo/example/samplebuild/sample/template/403.tpl
+	//	在模版的根目录建立相应代码状态的模版例如：("403.tpl")
+	return BodyStatusPage(Status403, "无权访问", "", "")
+}
+</pre>
+	<br/>
+
+	<a href="/sp/s404.htm">http://localhost:8080/sp/s404.htm</a>
+	<br/>
+<pre>
+都没有这个页面，所以点击看看吧。
+</pre>
+	<br/>
+
+
+</body>
+</html>

@@ -22,6 +22,7 @@
 package leafveingo
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -215,7 +216,7 @@ type ISFLeafvein interface {
 	/* private method*/
 
 	//	状态页面输出
-	statusPage(wr io.Writer, value HttpStatusValue) error
+	statusPageExecute(wr io.Writer, value HttpStatusValue) error
 }
 
 //	使用Leafvein，会将已经初始化好的ISFLeafvein进行同一返回，程序运行只初始化一次
@@ -342,7 +343,7 @@ func (lv *sfLeafvein) initPrivate() {
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, lv.Version)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_NAME, lv.AppName)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_VERSION, lv.AppVersion)
-	lv.template.SetFunc(TEMPLATE_FUNC_KEY_IS_DEVEL, lv.isDevel)
+	lv.template.SetFunc(TEMPLATE_FUNC_KEY_IS_DEVEL, lv.IsDevel)
 
 }
 
@@ -355,35 +356,41 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if err := recover(); err != nil {
 			errStr := fmt.Sprintln(err)
-			var stack string = errStr
+
+			stackBuf := bytes.NewBufferString("")
+
 			for i := 2; ; i++ {
 				pc, file, line, ok := runtime.Caller(i)
 				if !ok {
 					break
 				}
-
-				stack = stack + fmt.Sprintf("%s:%d (0x%x)\n", file, line, pc)
+				fn := runtime.FuncForPC(pc).Name()
+				if 0 != len(file) {
+					//	/usr/local/go/src/pkg/runtime/proc.c:1223 (0x173d0)
+					fmt.Fprintf(stackBuf, "%s(...)\n%s:%d (0x%x)\n", fn, file, line, pc)
+				} else {
+					// 	runtime.goexit(...)
+					// 	L1223: runtime.goexit(...) (0x173d0)
+					fmt.Fprintf(stackBuf, "L%d: %s(...) (0x%x)\n", line, fn, pc)
+				}
 			}
 
-			stack = stack + fmt.Sprintf("\n-----------------------------\nleafveiongo version:%v \ngolang version: %v", lv.Version(), runtime.Version())
-
-			//	暂时字符输出，到时候更改模板TODO
-			const ErrorCode500String = "Internal Server Error"
 			if nil != context {
 				if lv.isDevel {
-					context.StatusPageWrite(Status500, ErrorCode500String, errStr, stack)
+					context.StatusPageWrite(Status500, Status500Msg, errStr, stackBuf.String())
 				} else {
-					context.StatusPageWrite(Status500, ErrorCode500String, "", "")
+					context.StatusPageWrite(Status500, Status500Msg, "", "")
 				}
 			} else {
 				if lv.isDevel {
-					lv.statusPage(rw, NewHttpStatusValue(Status500, ErrorCode500String, errStr, stack))
+					lv.statusPageWriter(rw, NewHttpStatusValue(Status500, Status500Msg, errStr, stackBuf.String()))
 				} else {
-					lv.statusPage(rw, NewHttpStatusValue(Status500, ErrorCode500String, "", ""))
+					lv.statusPageWriter(rw, NewHttpStatusValue(Status500, Status500Msg, "", ""))
 				}
 			}
 
-			lvLog.Error("%v", stack)
+			fmt.Fprintf(stackBuf, "\n-----------------------------\nleafveiongo version:%v \ngolang version: %v", lv.Version(), runtime.Version())
+			lvLog.Error(stackBuf.String())
 		}
 
 		if nil != context {
@@ -425,7 +432,8 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 				} else {
 					//	404
-					http.NotFound(rw, req)
+					// http.NotFound(rw, req)
+					lv.statusPageWriter(rw, NewHttpStatusValue(Status404, Status404Msg, "", ""))
 				}
 				return
 			}
@@ -434,36 +442,36 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	context = newContext(rw, req, lv.isRespWriteCompress)
 
-	routerKey, methodName, ctrlPath, stuctCode := lv.routerParse(reqPath, context)
+	routerKey, methodName, ctrlPath, statusCode := lv.routerParse(reqPath, context)
 
-	if Status200 == stuctCode {
+	if Status200 == statusCode {
 		var e error = nil
-		stuctCode, e = lv.cellController(routerKey, methodName, ctrlPath, context)
+		errstr := ""
+		statusCode, e = lv.cellController(routerKey, methodName, ctrlPath, context)
 		if nil != e {
-			lvLog.Error("%v", e)
+			lvLog.Error(e.Error())
+			if lv.isDevel {
+				errstr = e.Error()
+			}
 		}
-	}
 
-	switch stuctCode {
-	case Status200, Status301, Status307:
-		//	不做处理的代码
+		switch statusCode {
+		case Status200, Status301, Status307:
+			//	不作处理的状态
+		case Status400:
+			context.StatusPageWrite(statusCode, Status400Msg, errstr, "")
+		case Status403:
+			context.StatusPageWrite(statusCode, Status403Msg, errstr, "")
+		case Status500:
+			context.StatusPageWrite(statusCode, Status500Msg, errstr, "")
+		case Status503:
+			context.StatusPageWrite(statusCode, Status503Msg, errstr, "")
+		default:
+			context.StatusPageWrite(statusCode, Status404Msg, errstr, "")
+		}
 
-	case Status400:
-		const ErrorCode400String = "Bad Request"
-		context.StatusPageWrite(stuctCode, ErrorCode400String, "", "")
-	case Status403:
-		const ErrorCode403String = "Forbidden The server understood the request"
-		context.StatusPageWrite(stuctCode, ErrorCode403String, "", "")
-	case Status500:
-		const ErrorCode500String = "Internal Server Error"
-		context.StatusPageWrite(stuctCode, ErrorCode500String, "", "")
-	case Status503:
-		const ErrorCode503String = "Service Unavailable"
-		context.StatusPageWrite(stuctCode, ErrorCode503String, "", "")
-	default:
-		//	默认跳转404
-		const ErrorCode404String = "page not found"
-		context.StatusPageWrite(stuctCode, ErrorCode404String, "", "")
+	} else {
+		context.StatusPageWrite(statusCode, StatusMsg(statusCode), "", "")
 	}
 
 }

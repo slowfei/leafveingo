@@ -118,3 +118,18 @@ func BodyServeFile(path string) ServeFilePath {
 	//	TODO 输出文件的保存名称默认可能是url的地址结尾名称，这个可能需要优化。
 	return ServeFilePath(path)
 }
+
+//	out status page
+//
+//	@status Status404...
+//	@msg
+//	@error
+//	@stack
+func BodyStatusPage(status HttpStatus, msg, error, stack string) HttpStatusValue {
+	return NewHttpStatusValue(status, msg, error, stack)
+}
+
+//	out status pata custom data map
+func BodyStatusPageByData(status HttpStatus, data map[string]string) HttpStatusValue {
+	return HttpStatusValue{status, data}
+}

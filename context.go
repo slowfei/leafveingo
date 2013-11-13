@@ -257,17 +257,22 @@ func (ctx *HttpContext) ComperssWriter() io.Writer {
 
 //	status page write
 func (ctx *HttpContext) StatusPageWrite(status HttpStatus, msg, error, stack string) error {
+	return ctx.StatusPageWriteByValue(NewHttpStatusValue(status, msg, error, stack))
+}
+
+//	status page write
+func (ctx *HttpContext) StatusPageWriteByValue(value HttpStatusValue) error {
 	if nil == _thisLeafvein {
 		return ErrLeafveingoNotInit
 	}
+	ioWr := ctx.ComperssWriter()
 	ctx.RespWrite.Header().Set("Content-Type", "text/html; charset="+_thisLeafvein.Charset())
-	ctx.RespWrite.WriteHeader(int(status))
-	err := _thisLeafvein.statusPage(ctx.ComperssWriter(), NewHttpStatusValue(status, msg, error, stack))
+	ctx.RespWrite.WriteHeader(int(value.status))
+	err := _thisLeafvein.statusPageExecute(ioWr, value)
 
 	if nil != err {
 		lvLog.Error(err.Error())
 		return err
 	}
-
 	return nil
 }

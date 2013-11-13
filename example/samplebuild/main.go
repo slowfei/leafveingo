@@ -111,7 +111,7 @@ func main() {
 	//	router  key  = "/admin"  = http://localhost:8080/adminuser
 	//	router  key  = "/admin/" = http://localhost:8080/admin/user
 	//
-	//	控制器的函数名 = ""(默认index)
+	//	控制器的函数名 = ""(默认index)ioWr
 	//	router  key  = "/admin"  = http://localhost:8080/adminindex
 	//	router  key  = "/admin/" = http://localhost:8080/admin/index
 	//	router  key  = "/" 		 = http://localhost:8080/
@@ -139,6 +139,9 @@ func main() {
 	//	控制器模板演示
 	//	http: //localhost:8080/t/
 	leafvein.AddController("/t/", TemplateController{})
+
+	//	状态页演示
+	leafvein.AddController("/sp/", StatusController{})
 
 	//	启动
 	leafvein.Start()
