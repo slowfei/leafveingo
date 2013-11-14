@@ -256,11 +256,14 @@ func (ctx *HttpContext) ComperssWriter() io.Writer {
 }
 
 //	status page write
+//	指定模版的几个参数值，在模板中信息信息的输出
+//	模版的默认map key: {{.msg}} {{.status}} {{.error}} {{.stack}}
 func (ctx *HttpContext) StatusPageWrite(status HttpStatus, msg, error, stack string) error {
 	return ctx.StatusPageWriteByValue(NewHttpStatusValue(status, msg, error, stack))
 }
 
 //	status page write
+//	可以自定义指定模版的参数
 func (ctx *HttpContext) StatusPageWriteByValue(value HttpStatusValue) error {
 	if nil == _thisLeafvein {
 		return ErrLeafveingoNotInit
