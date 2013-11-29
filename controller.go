@@ -58,7 +58,7 @@ func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context 
 			}
 			context.RespBodyWrite(cvt.Body, Status200)
 		case SFJson.Json:
-			context.RespWrite.Header().Set("Content-Type", "application/json")
+			context.RespWrite.Header().Set("Content-Type", "application/json; charset="+lv.charset)
 			context.RespBodyWrite(cvt.Byte(), Status200)
 		case HtmlOut:
 			context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.charset)
