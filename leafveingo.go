@@ -748,7 +748,7 @@ func (lv *sfLeafvein) SetAppName(name string) {
 	}
 
 	lv.appName = name
-	lv.operatingDir = filepath.Join(SFFileManager.GetExceDir(), lv.appName)
+	lv.operatingDir = filepath.Join(SFFileManager.GetExecDir(), lv.appName)
 	//	由于主操作目录改变，模板目录也需要重新设置主目录
 	lv.template.SetBaseDir(lv.TemplateDir())
 }
