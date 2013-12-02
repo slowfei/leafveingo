@@ -337,7 +337,7 @@ func (lv *sfLeafvein) initPrivate() {
 
 	loadConfigByJson([]byte(_defaultConfigJson))
 
-	lv.operatingDir = filepath.Join(SFFileManager.GetExceDir(), lv.appName)
+	lv.operatingDir = filepath.Join(SFFileManager.GetExecDir(), lv.appName)
 
 	lv.template.SetBaseDir(lv.TemplateDir())
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, lv.Version)
