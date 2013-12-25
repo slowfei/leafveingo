@@ -177,6 +177,12 @@ type ISFLeafvein interface {
 	SetRespWriteCompress(b bool)
 	IsRespWriteCompress() bool
 
+	//	out html is compact remove (\t \n space) sign
+	//	only template file out use
+	//	default true
+	SetCompactHTML(compact bool)
+	IsCompactHTML() bool
+
 	//	set leafveingo http request supported suffixes. e.g.: (.go),(.html) ...
 	//	default nil, what form can access, the first is the default suffix
 	SetHTTPSuffixs(suffixs ...string)
@@ -296,6 +302,8 @@ type sfLeafvein struct {
 
 	//	template
 	template LVTemplate.ITemplate
+	// is Compact HTML, 默认true
+	isCompactHTML bool
 
 	//	http session manager
 	sessionManager *LVSession.HttpSessionManager
@@ -733,6 +741,13 @@ func (lv *sfLeafvein) SetRespWriteCompress(b bool) {
 }
 func (lv *sfLeafvein) IsRespWriteCompress() bool {
 	return lv.isRespWriteCompress
+}
+
+func (lv *sfLeafvein) SetCompactHTML(compact bool) {
+	lv.template.SetCompactHTML(compact)
+}
+func (lv *sfLeafvein) IsCompactHTML() bool {
+	return lv.template.IsCompactHTML()
 }
 
 func (lv *sfLeafvein) SetServerTimeout(seconds int64) {

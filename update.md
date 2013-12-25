@@ -4,14 +4,16 @@ Leafveingo update log
 
 
 ####version 0.0.1.000 rc2
-1. 模版函数
-> * (new) string to html
+1. 模版
+> * (new) 新建模版函数：string to html
+> * (new) 增加导入模版时对html文件去除空格和换行符号，可以使用SetCompactHTML进行相应的设置。
 
 1. 日志工具
 > * 对日志操作进行了整改
 
 1. 配置文件功能
 > *	增加了leafveingo的配置功能
+
 
 
 -----------

@@ -38,6 +38,9 @@ func BaseInitLeafveingo() leafveingo.ISFLeafvein {
 	//	设置相应输出写入是使用压缩，默认gzip优先，主要看浏览器支持的压缩类型，默认是为true的。
 	leafvein.SetRespWriteCompress(true)
 
+	//	使用模版时，是否将html去除空格和换行符,默认true
+	leafvein.SetCompactHTML(true)
+
 	//	开启或关闭HttpSession, 默认起始时true,这里主要是为了演示
 	leafvein.SetUseSession(true)
 

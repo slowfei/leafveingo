@@ -28,6 +28,7 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
+	"regexp"
 	"runtime"
 	"sync"
 )
@@ -44,6 +45,21 @@ const (
 var (
 	// private
 	thisTemplate ITemplate
+
+	/*  根据顺序使用正则来去除html的换行和空格
+	TODO 在javascript中括号中的空格还未完全去除，此正则操作可能过于繁琐，还没有找到好的解决方案。
+	而且也比较耗时间，不过在进行缓存后可以忽略
+	*/
+	//	1.标签外的空格
+	_rexTagExtSpace = regexp.MustCompile(`>[[:space:]]+<`)
+	//	2.去除空行与注释
+	_rexEmptyLineNode = regexp.MustCompile(`(\n\s+|\n)|(<%--[\s\S]+?-->)`)
+	//	3.去除标签内的首个空格
+	_rexTagFirstSpace = regexp.MustCompile(`(<\w+)\s{2,}`)
+	//	4.去除标签内结尾空格
+	_rexTagLastSpace = regexp.MustCompile(`\s+(>|/>)`)
+	//	5.去除"="符号的两边空格
+	_rexSignSpace = regexp.MustCompile(`\s*(=|!=|==)\s*`)
 )
 
 //	模板数据，用于封装使用模板的数据传递
@@ -119,18 +135,23 @@ type ITemplate interface {
 	//	@tplPath	模板的相对路径
 	Get(tplPath string) *template.Template
 
-	//	是否设置模板缓存处理
+	//	是否设置模板缓存处理,默认false
 	SetCache(cache bool)
 	IsCache() bool
+
+	//	是否设置压缩HTML代码格式，默认true
+	SetCompactHTML(compact bool)
+	IsCompactHTML() bool
 }
 
 //	leafveingo 内置模板结构，用于私有的实现
 type lvtemplate struct {
-	funcMap    template.FuncMap   // 模板函数
-	goTemplate *template.Template // 唯一的模板管理
-	isCache    bool               // 是否加入缓存
-	baseDir    string             // 模板路径的主目录
-	rwmutex    sync.RWMutex
+	funcMap       template.FuncMap   // 模板函数
+	goTemplate    *template.Template // 唯一的模板管理
+	isCache       bool               // 是否加入缓存 默认false
+	isCompactHTML bool               //	是否压缩HTML代码格式，默认true
+	baseDir       string             // 模板路径的主目录 默认执行文件目录
+	rwmutex       sync.RWMutex
 }
 
 func (l *lvtemplate) initPrivate() {
@@ -142,6 +163,7 @@ func (l *lvtemplate) initPrivate() {
 	l.funcMap[kLVTimeFormat] = SFTimeUtil.YMDHMSSFormat
 	l.goTemplate = template.New("LVTemplate")
 	l.baseDir = ""
+	l.isCompactHTML = true
 }
 
 func (l *lvtemplate) Get(tplPath string) *template.Template {
@@ -162,6 +184,18 @@ func (l *lvtemplate) Parse(tplPath string) (*template.Template, error) {
 		if nil != err {
 			return nil, err
 		}
+
+		if l.isCompactHTML {
+			// []byte{62, 60} = "><"
+			read = _rexTagExtSpace.ReplaceAll(read, []byte{62, 60})
+			read = _rexEmptyLineNode.ReplaceAll(read, []byte{})
+			//	[]byte{36, 123, 49, 125, 32} = "${1} "
+			read = _rexTagFirstSpace.ReplaceAll(read, []byte{36, 123, 49, 125, 32})
+			//	[]byte{36, 123, 49, 125} = "${1}"
+			read = _rexTagLastSpace.ReplaceAll(read, []byte{36, 123, 49, 125})
+			read = _rexSignSpace.ReplaceAll(read, []byte{36, 123, 49, 125})
+		}
+
 		tplString := string(read)
 
 		if l.isCache {
@@ -183,6 +217,7 @@ func (l *lvtemplate) Parse(tplPath string) (*template.Template, error) {
 
 func (l *lvtemplate) ParseString(name, src string) (*template.Template, error) {
 	var tmpl *template.Template
+
 	if l.isCache {
 		if tmpl = l.goTemplate.Lookup(name); nil != tmpl {
 			return tmpl, nil
@@ -190,6 +225,21 @@ func (l *lvtemplate) ParseString(name, src string) (*template.Template, error) {
 		tmpl = l.goTemplate.New(name)
 	} else {
 		tmpl = template.New(name)
+	}
+
+	if l.isCompactHTML {
+		read := []byte(src)
+
+		// []byte{62, 60} = "><"
+		read = _rexTagExtSpace.ReplaceAll(read, []byte{62, 60})
+		read = _rexEmptyLineNode.ReplaceAll(read, []byte{})
+		//	[]byte{36, 123, 49, 125, 32} = "${1} "
+		read = _rexTagFirstSpace.ReplaceAll(read, []byte{36, 123, 49, 125, 32})
+		//	[]byte{36, 123, 49, 125} = "${1}"
+		read = _rexTagLastSpace.ReplaceAll(read, []byte{36, 123, 49, 125})
+		read = _rexSignSpace.ReplaceAll(read, []byte{36, 123, 49, 125})
+
+		src = string(read)
 	}
 
 	tmpl.Funcs(l.funcMap)
@@ -234,7 +284,6 @@ func (l *lvtemplate) SetFunc(key string, methodFunc interface{}) {
 func (l *lvtemplate) DelFunc(key string) {
 	l.rwmutex.Lock()
 	defer l.rwmutex.Unlock()
-
 	delete(l.funcMap, key)
 }
 
@@ -248,26 +297,22 @@ func (l *lvtemplate) DelAllFunc() {
 }
 
 func (l *lvtemplate) SetBaseDir(path string) {
-	l.rwmutex.Lock()
-	defer l.rwmutex.Unlock()
-
 	l.baseDir = path
 }
 func (l *lvtemplate) BaseDir() string {
-	l.rwmutex.RLock()
-	defer l.rwmutex.RUnlock()
 	return l.baseDir
 }
 
-func (l *lvtemplate) SetCache(cache bool) {
-	l.rwmutex.Lock()
-	defer l.rwmutex.Unlock()
+func (l *lvtemplate) SetCompactHTML(compact bool) {
+	l.isCompactHTML = compact
+}
+func (l *lvtemplate) IsCompactHTML() bool {
+	return l.isCompactHTML
+}
 
+func (l *lvtemplate) SetCache(cache bool) {
 	l.isCache = cache
 }
 func (l *lvtemplate) IsCache() bool {
-	l.rwmutex.RLock()
-	defer l.rwmutex.RUnlock()
-
 	return l.isCache
 }

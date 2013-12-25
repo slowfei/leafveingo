@@ -72,6 +72,7 @@ var (
 		"StaticFileSuffixs"	:[".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"],
 		"Charset"		:"utf-8",
 		"IsRespWriteCompress"	:true,
+		"IsCompactHTML"			:true,
 		"FileUploadSize"	:33554432,
 		"IsUseSession"		:true,
 		"IsGCSession"		:true,
@@ -96,6 +97,7 @@ type Config struct {
 	StaticFileSuffixs   []string          // static file suffixs default ".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"
 	Charset             string            // default html charset utf-8
 	IsRespWriteCompress bool              // default response write compress true
+	IsCompactHTML       bool              // out html compact remove (\t \n space) sign,only template file out use. default true
 	FileUploadSize      int64             // file size default upload  32M
 	IsUseSession        bool              // default use http session true
 	IsGCSession         bool              // default gc http session true
@@ -199,7 +201,7 @@ func InitLeafvein(configPath string) ISFLeafvein {
 	return _thisLeafvein
 }
 
-//	进行配置的设置。
+//	进行配置的设置
 func setLeafveingoConfig() {
 	if nil != _thisLeafvein {
 		cf := _thisLeafvein.Config()
@@ -263,6 +265,9 @@ func setLeafveingoConfig() {
 
 			// isRespWriteCompress bool
 			_thisLeafvein.SetRespWriteCompress(cf.IsRespWriteCompress)
+
+			//	IsCompactHTML bool
+			_thisLeafvein.SetCompactHTML(cf.IsCompactHTML)
 
 			// file size upload 32M fileUploadSize
 			_thisLeafvein.SetFileUploadSize(cf.FileUploadSize)
