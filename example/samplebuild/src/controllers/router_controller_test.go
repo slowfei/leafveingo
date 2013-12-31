@@ -8,7 +8,7 @@ import (
 func TestRouterMethodParse(t *testing.T) {
 	arc := RouterController{}
 
-	requrl := "/router/forum-10-20"
+	requrl := "/router/forum-10-20.json"
 	fmt.Println("url = ", requrl)
 	m, p := arc.RouterMethodParse(requrl)
 	fmt.Println("methodName:", m)

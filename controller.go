@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-16
-//  Update on 2013-10-23
+//  Update on 2013-12-31
 //  Email  slowfei@foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -37,8 +37,8 @@ import (
 )
 
 //	控制器返回参数处理
-func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context *HttpContext) (stuctCode HttpStatus, err error) {
-	stuctCode = Status200
+func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context *HttpContext) (statusCode HttpStatus, err error) {
+	statusCode = Status200
 
 	if 1 == len(v) {
 		rv := reflect.Indirect(v[0])
@@ -80,7 +80,7 @@ func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context 
 		case Redirect:
 			context.RespWrite.Header().Del("Content-Encoding")
 			http.Redirect(context.RespWrite, context.Request, string(cvt), int(Status301))
-			stuctCode = Status301
+			statusCode = Status301
 		case Dispatcher:
 			if 0 == len(cvt.MethodName) {
 				cvt.MethodName = CONTROLLER_DEFAULT_METHOD
@@ -96,12 +96,12 @@ func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context 
 				}
 
 				var e error = nil
-				stuctCode, e = lv.cellController(cvt.Router, cvt.MethodName, dispCtrURLPath, context)
+				statusCode, e = lv.cellController(cvt.Router, cvt.MethodName, "", dispCtrURLPath, context)
 				if nil != e {
 					lvLog.Error("dispatcher: (%v)controller (%v)method error:%v", ctrlVal.Type().String(), cvt.MethodName, e)
 				}
 			} else {
-				stuctCode = Status500
+				statusCode = Status500
 				//	这个是自定义写代码的转发，如果查找不到相当于是调用者代码问题，所以直接抛出异常（恐慌）。
 				ErrControllerDispatcherNotFound.Message = lvLog.Error("dispatcher: controller not found router key:%v", cvt.Router)
 				panic(ErrControllerDispatcherNotFound)
@@ -134,7 +134,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 	files map[string][]*multipart.FileHeader,
 	fileNum int,
 	err error,
-	stuctCode HttpStatus) {
+	statusCode HttpStatus) {
 
 	switch req.Method {
 	case "GET":
@@ -144,7 +144,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 		enctype, _, e := mime.ParseMediaType(contentType)
 		if nil != e {
 			err = e
-			stuctCode = Status400
+			statusCode = Status400
 			return
 		}
 
@@ -152,7 +152,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 		case enctype == "application/x-www-form-urlencoded":
 			err = req.ParseForm()
 			if nil != err {
-				stuctCode = Status400
+				statusCode = Status400
 				return
 			}
 
@@ -162,7 +162,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 		case enctype == "multipart/form-data":
 			err = req.ParseMultipartForm(lv.fileUploadSize)
 			if nil != err {
-				stuctCode = Status400
+				statusCode = Status400
 				return
 			}
 			// ParseMultipartForm()解析已经调用了ParseForm()
@@ -187,7 +187,7 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 		urlValues = make(url.Values)
 	}
 
-	stuctCode = Status200
+	statusCode = Status200
 	return
 }
 
@@ -291,17 +291,22 @@ func (lv *sfLeafvein) cellMethod(
 }
 
 //	操作控制器请求的处理
-//	@controller		请求的控制器
-//	@funcName		控制器函数名
-//	@ctrURLPath		控制器url路径
-//	@rw
-//	@req
-func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, context *HttpContext) (stuctCode HttpStatus, err error) {
+//
+//	@param routerKey	controller router key
+//	@param methodName	cell controller method name
+//	@param urlSuffix	request url path suffix
+//	@param ctrlPath		controller and method join path
+//	@param context
+//
+//	@return statusCode 	http status code
+//	@return err
+//
+func (lv *sfLeafvein) cellController(routerKey, methodName, urlSuffix, ctrlPath string, context *HttpContext) (statusCode HttpStatus, err error) {
 	ctrlVal, ok := lv.controllers[routerKey]
 
 	if !ok {
 		err = errors.New(lvLog.Error("cellController not found router key:%v", routerKey))
-		stuctCode = Status404
+		statusCode = Status404
 		return
 	}
 
@@ -313,7 +318,6 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 	case reflect.Ptr:
 		//	指针类型不做操作，直接使用该对象。
 	default:
-		//	如果判断不为指针结构的值，就创建一个新的
 		ctrlVal = reflect.New(ctrlVal.Type())
 	}
 
@@ -329,23 +333,32 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 	//	是否执行调用控制器方法
 	isCell := false
 
-	if requestMethodValue = ctrlVal.MethodByName(methodName); requestMethodValue.IsValid() {
-		isCell = true
+	//	函数后缀处理
+	if 0 != len(urlSuffix) {
+		if requestMethodValue = ctrlVal.MethodByName(methodName + strings.Title(urlSuffix)); requestMethodValue.IsValid() {
+			isCell = true
+		}
+	}
+	if !isCell {
+		if requestMethodValue = ctrlVal.MethodByName(methodName); requestMethodValue.IsValid() {
+			isCell = true
+		}
+	}
+	if !isCell {
+		err = errors.New(fmt.Sprintf("cellController not found method name:%v", methodName))
+		statusCode = Status404
+		return
+	}
 
+	if isCell {
+
+		//	before and after method
 		if beforeMethodValue = ctrlVal.MethodByName(CONTROLLER_BEFORE_METHOD); beforeMethodValue.IsValid() {
 			isBefore = true
 		}
 		if afterMethodValue = ctrlVal.MethodByName(CONTROLLER_AFTER_METHOD); afterMethodValue.IsValid() {
 			isAfter = true
 		}
-
-	} else {
-		err = errors.New(fmt.Sprintf("cellController not found method name:%v", methodName))
-		stuctCode = Status404
-		return
-	}
-
-	if isCell {
 
 		//	请求参数
 		var urlValues url.Values
@@ -354,8 +367,8 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 		//	记录文件请求数量
 		fileNum := 0
 
-		urlValues, files, fileNum, err, stuctCode = lv.parseFormParams(context.Request)
-		if Status200 != stuctCode {
+		urlValues, files, fileNum, err, statusCode = lv.parseFormParams(context.Request)
+		if Status200 != statusCode {
 			return
 		}
 
@@ -377,10 +390,10 @@ func (lv *sfLeafvein) cellController(routerKey, methodName, ctrlPath string, con
 			//	request controller cell method
 			rvs := lv.cellMethod(requestMethodValue, urlValues, files, context, true)
 			//	处理控制器返回值
-			stuctCode, err = lv.returnValue(rvs, ctrlPath, context)
+			statusCode, err = lv.returnValue(rvs, ctrlPath, context)
 		} else {
 			//	请求拒绝
-			stuctCode = Status403
+			statusCode = Status403
 			//	error info is return?
 		}
 

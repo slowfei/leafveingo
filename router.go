@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-14
-//  Update on 2013-10-23
+//  Update on 2013-12-31
 //  Email  slowfei@foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -88,8 +88,24 @@ type AdeRouterController interface {
 
 //	url路由器解析
 //
-func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerKey, methodName, ctrlPath string, stuctCode HttpStatus) {
+//	@param reqPath		request url path
+//	@param context
+//
+//	@return routerKey	parsed router key
+//	@return methodName	parsed controller method name
+//	@return urlSuffix	parsed request url path suffix
+//	@return ctrlPath	parsed controller and method name join path
+//	@return statusCode	http status code
+//
+func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerKey, methodName, urlSuffix, ctrlPath string, statusCode HttpStatus) {
 	logInfo := fmt.Sprintf("request url path: %#v", reqPath)
+
+	suffixIndex := strings.LastIndex(reqPath, ".")
+
+	//	记录URL后缀，用于函数后缀使用
+	if -1 < suffixIndex {
+		urlSuffix = reqPath[suffixIndex+1:]
+	}
 
 	//	去除url请求后缀
 	//	/index.go = /index
@@ -109,7 +125,7 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 		}
 		if !isSuffix {
 			//	跳转404页面
-			stuctCode = Status404
+			statusCode = Status404
 			logInfo += "\nInvalid suffix"
 			lvLog.Info(logInfo)
 			return
@@ -117,7 +133,6 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 
 	} else {
 		//	检测是否有后缀名，有则去除
-		suffixIndex := strings.LastIndex(reqPath, ".")
 		if 0 < suffixIndex {
 			reqPath = reqPath[:suffixIndex]
 		}
@@ -152,7 +167,8 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 
 				if 0 == len(methodName) {
 					//	404
-					stuctCode = Status404
+					statusCode = Status404
+					lvLog.Info("AdeRouter method pares nil to 404.")
 					return
 				}
 
@@ -176,7 +192,7 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 			//	匹配函数名是否正确
 			if !_rexValidMethodName.MatchString(methodName) {
 				//	404
-				stuctCode = Status404
+				statusCode = Status404
 				return
 			} else {
 				//	控制器的函数名称将首字母转换成大写
@@ -197,10 +213,10 @@ func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerK
 		methodName = strings.Title(strings.ToLower(method)) + methodName
 	}
 
-	logInfo += fmt.Sprintf("\ncontroller   key: %#v   method name: %#v   path: %#v \n", reqPath, methodName, ctrlPath)
+	logInfo += fmt.Sprintf("\ncontroller   key: %#v   methodName: %#v  urlSuffix: %#v   path: %#v \n", reqPath, methodName, urlSuffix, ctrlPath)
 	lvLog.Info(logInfo)
 
-	stuctCode = Status200
+	statusCode = Status200
 	return
 
 }

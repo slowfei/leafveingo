@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-16
-//  Update on 2013-10-23
+//  Update on 2013-12-31
 //  Email  slowfei@foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.1.000
@@ -423,23 +423,20 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	//	静态文件解析
-	if reqPath[len(reqPath)-1] != '/' {
+	if reqPath[len(reqPath)-1] != '/' && 0 != len(lv.staticFileSuffixs) {
 		for _, staticSuffixs := range lv.staticFileSuffixs {
 			if strings.HasSuffix(reqPath, staticSuffixs) {
 				filePath := path.Clean(lv.WebRootDir()) + reqPath
 
 				if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
-
 					//	处理http.ServeFile函数遇到/index.html被重定向到./的问题
 					if strings.HasSuffix(reqPath, INDEX_PAGE) {
 						// 防止serveFile做判断，具体可以查看http.ServeFile源码
 						req.URL.Path = "/"
 					}
-
 					http.ServeFile(rw, req, filePath)
-
 				} else {
-					//	404
+					// 404
 					// http.NotFound(rw, req)
 					lv.statusPageWriter(rw, NewHttpStatusValue(Status404, Status404Msg, "", ""))
 				}
@@ -450,12 +447,12 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	context = newContext(rw, req, lv.isRespWriteCompress)
 
-	routerKey, methodName, ctrlPath, statusCode := lv.routerParse(reqPath, context)
+	routerKey, methodName, urlSuffix, ctrlPath, statusCode := lv.routerParse(reqPath, context)
 
 	if Status200 == statusCode {
 		var e error = nil
 		errstr := ""
-		statusCode, e = lv.cellController(routerKey, methodName, ctrlPath, context)
+		statusCode, e = lv.cellController(routerKey, methodName, urlSuffix, ctrlPath, context)
 		if nil != e {
 			lvLog.Error(e.Error())
 			if lv.isDevel {

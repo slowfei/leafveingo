@@ -30,7 +30,7 @@ func BaseInitLeafveingo() leafveingo.ISFLeafvein {
 	leafvein.SetAppVersion("1.0")
 
 	//	设置URL可访问后缀，可要写好了，有个"."开头
-	leafvein.SetHTTPSuffixs(".go", ".htm")
+	leafvein.SetHTTPSuffixs(".go", ".htm", ".json")
 
 	//	设置静态文件后缀
 	leafvein.SetStaticFileSuffixs(".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html")

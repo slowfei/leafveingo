@@ -4,6 +4,9 @@ Leafveingo update log
 
 
 ####version 0.0.1.000 rc2
+1. 路由器
+> * (new) 增加URL后缀解析控制器函数操作，具体查看sample案例的samplebuild/src/controllers/router_controller.go Forum函数。
+
 1. 模版
 > * (new) 新建模版函数：string to html
 > * (new) 增加导入模版时对html文件去除空格和换行符号，可以使用SetCompactHTML进行相应的设置。

@@ -10,14 +10,14 @@
 	<h1>高级路由器演示</h1>
 <pre>
 var (
-	_urlrexForum  = regexp.MustCompile(`^/[rR]outer/forum-([0-9]+)-([0-9]+)$`)
+	_urlrexForum  = regexp.MustCompile(`^/[rR]outer/forum-([0-9]+)-([0-9]+)(\.\w+)?$`)
 	_urlrexThread = regexp.MustCompile(`^/[rR]outer/thread-(?P<bid>[0-9]+)-(?P<tid>[0-9]+)-(?P<pid>[0-9]+)$`)
 	_urlrexSpace  = regexp.MustCompile(`^/[rR]outer/space/(username|uid)/(.+)/$`)
 	_urlrexMD5    = regexp.MustCompile(`^/[rR]outer/[0-9a-zA-Z]{32}$`)
 )
 
 //	解析的URL
-//	http://localhost:8080/router/forum-([0-9]+)-([0-9]+)
+//	http://localhost:8080/router/forum-([0-9]+)-([0-9]+)(\.\w+)?
 //	http://localhost:8080/router/thread-([0-9]+)-([0-9]+)-([0-9]+)
 //	http://localhost:8080/router/space/(username|uid)/(.+)/
 //	http://localhost:8080/router/[0-9a-zA-Z]{32}
@@ -77,6 +77,23 @@ func (arc *RouterController) Forum(params struct {
 	Tid int
 }) string {
 	return fmt.Sprintf("Bid=%v\nTid=%v", params.Bid, params.Tid)
+}
+</pre>
+<br/>
+
+<a href="/router/forum-10-20.json">http://localhost:8080/router/forum-10-20.json</a>
+<br/>
+<pre>
+//	url 后缀为json
+func (arc *RouterController) ForumJson(params struct {
+	Bid int
+	Tid int
+}) interface{} {
+	j, e := leafveingo.BodyJson(params)
+	if nil != e {
+		return e.Error()
+	}
+	return j
 }
 </pre>
 <br/>

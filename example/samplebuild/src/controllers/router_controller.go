@@ -2,11 +2,12 @@ package controller
 
 import (
 	"fmt"
+	"github.com/slowfei/leafveingo"
 	"regexp"
 )
 
 var (
-	_urlrexForum  = regexp.MustCompile(`^/[rR]outer/forum-([0-9]+)-([0-9]+)$`)
+	_urlrexForum  = regexp.MustCompile(`^/[rR]outer/forum-([0-9]+)-([0-9]+)(\.\w+)?$`)
 	_urlrexThread = regexp.MustCompile(`^/[rR]outer/thread-(?P<bid>[0-9]+)-(?P<tid>[0-9]+)-(?P<pid>[0-9]+)$`)
 	_urlrexSpace  = regexp.MustCompile(`^/[rR]outer/space/(username|uid)/(.+)/$`)
 	_urlrexMD5    = regexp.MustCompile(`^/[rR]outer/[0-9a-zA-Z]{32}$`)
@@ -18,17 +19,16 @@ type RouterController struct {
 }
 
 //	解析的URL
-//	http://localhost:8080/router/forum-([0-9]+)-([0-9]+)
+//	http://localhost:8080/router/forum-([0-9]+)-([0-9]+)(\.\w+)?
 //	http://localhost:8080/router/thread-([0-9]+)-([0-9]+)-([0-9]+)
 //	http://localhost:8080/router/space/(username|uid)/(.+)/
 //	http://localhost:8080/router/[0-9a-zA-Z]{32}
 func (arc RouterController) RouterMethodParse(requrl string) (methodName string, params map[string]string) {
 	//	下面演示几种正则的解析操作，聪明的您肯定会以最优的处理方式来返回所需要的函数名和参数。
-
 	switch {
 	case _urlrexForum.MatchString(requrl):
 		ps := _urlrexForum.FindStringSubmatch(requrl)
-		if 3 == len(ps) {
+		if 3 <= len(ps) {
 			params = map[string]string{"bid": ps[1], "tid": ps[2]}
 			methodName = "Forum"
 			return
@@ -71,8 +71,19 @@ func (arc *RouterController) Forum(params struct {
 	Bid int
 	Tid int
 }) string {
-
 	return fmt.Sprintf("Bid=%v\nTid=%v", params.Bid, params.Tid)
+}
+
+//	url 后缀为json
+func (arc *RouterController) ForumJson(params struct {
+	Bid int
+	Tid int
+}) interface{} {
+	j, e := leafveingo.BodyJson(params)
+	if nil != e {
+		return e.Error()
+	}
+	return j
 }
 
 func (arc *RouterController) Thread(params struct {
