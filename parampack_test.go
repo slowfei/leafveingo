@@ -2,129 +2,277 @@ package leafveingo
 
 import (
 	"fmt"
-	"mime/multipart"
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 )
 
-type User struct {
-	Name    string
-	Sex     int
-	Type    *UserType
-	Arrays  *[]UserArray
-	File    multipart.FileHeader
-	Files   []multipart.FileHeader
-	FilePrt *multipart.FileHeader
-	Files2  []*multipart.FileHeader
-}
-
-type UserArray struct {
-	ArrayUUID string
-	Strs      []string
+type Hobby struct {
+	Name  string
+	Names []string
 }
 
 type UserType struct {
 	TypeName string
-	TypeUUID string
-	Tag      *TypeTag
 }
 
-type TypeTag struct {
-	TagName string
+type User struct {
+	UserName string
+	UserPwd  string
+	Type     UserType
+	TypeP    *UserType
+	Hobbys   []Hobby
+	HobbysP  []*Hobby
+	Content  []byte
 }
 
-func TestSetStructFieldValue(t *testing.T) {
+type Params struct {
+	Users    []User
+	UsersP   []*User
+	OneUser  User
+	OneUserP *User
+}
+
+//	测试单个设值测试，此函数主要用户调试测试
+func TestStringNameSetStructFieldValue(t *testing.T) {
 	leafvein := &sfLeafvein{}
 
-	//	基本设值测试
-	// var params struct{ Users User }
-	// fmt.Println("基本设值测试")
-	// leafvein.setStructFieldValue(reflect.ValueOf(&params), "users.Name", "user-slowfei_1")
-	// leafvein.setStructFieldValue(reflect.ValueOf(&params), "users.Type.TypeName", "type-slowfei_1")
-	// leafvein.setStructFieldValue(reflect.ValueOf(&params), "users.Type.TypeUUID", "UUID-slowfei_1")
-	// leafvein.setStructFieldValue(reflect.ValueOf(&params), "users.Type.Tag.TagName", "tag-slowfei_1")
-	// fmt.Println(params.Users.Name)
-	// fmt.Println(params.Users.Type.TypeName)
-	// fmt.Println(params.Users.Type.TypeUUID)
-	// fmt.Println(params.Users.Type.Tag.TagName)
-
-	//	集合设值测试
-	var params struct {
-		Users  []User
-		TagStr []string
-	}
 	keys := url.Values{}
-	keys.Add("users[0].name", "sl_name_1")
-	keys.Add("users[1].name", "sl_name_2")
-	keys.Add("users[2].name", "sl_name_3")
-	keys.Add("users[0].type.typeName", "sl_0_type_name")
-	keys.Add("users[0].type.typeUUID", "sl_0_type_UUID")
-	keys.Add("users[0].type.tag.tagName", "sl_0_type_tagName")
-	keys.Add("users[1].type.typeName", "sl_1_type_name")
-	keys.Add("users[1].type.typeUUID", "sl_1_type_UUID")
-	keys.Add("users[1].type.tag.tagName", "sl_1_type_tagName")
-	keys.Add("users[2].arrays[0].strs[0]", "sl_array_2_0_strs_0")
-	keys.Add("users[0].arrays[0].strs[0]", "sl_array_0_0_strs_0")
-	keys.Add("users[0].arrays[1].arrayUUID", "sl_array_0_1")
-	keys.Add("users[0].arrays[2].arrayUUID", "sl_array_0_2")
-	keys.Add("users[0].arrays[2].strs[0]", "sl_array_0_2_strs_0")
-	keys.Add("users[0].arrays[2].strs[1]", "sl_array_0_2_strs_1")
-	keys.Add("users[1].arrays[0].arrayUUID", "sl_array_1_0")
-	keys.Add("users[1].arrays[1].arrayUUID", "sl_array_1_1")
-	keys.Add("users[0].Files[0]", "")
-	keys.Add("tagStr[0]", "tag_0")
-	keys.Add("tagStr[1]", "tag_1")
-	keys.Add("tagStr[2]", "tag_2")
-	keys.Add("users.name", "sf_name_nil")
+	// keys.Add("users[0].hobbys[0].name", "hobbys0-0")
+	// keys.Add("users[0].hobbys[1].name", "hobbys0-1")
+	// keys.Add("users[0].hobbys[2].name", "hobbys0-2")
+	// keys.Add("users[1].hobbys[0].name", "hobbys1-0")
+	// keys.Add("users[1].hobbys[1].name", "hobbys1-1")
+	// keys.Add("users[0].typeP.typeName", "0-type-1")
+	// keys.Add("users[0].type.typeName", "0-type-2")
+	// keys.Add("users[1].hobbysP[0].name", "hobbysP1-0")
+	// keys.Add("users[1].hobbysP[1].name", "hobbysP1-1")
+	// keys.Add("oneUser.userName", "oneName")
+	// keys.Add("oneUser.userPwd", "onePwd")
+	// keys.Add("oneUser.hobbys[0].names[0]", "one-0-bobys-0-names-0")
+	// keys.Add("oneUser.hobbys[1].names[0]", "one-0-bobys-1-names-0")
+	keys.Add("usersP[0].hobbys[0].name", "userP0-hobbys0-0")
+	keys.Add("usersP[0].hobbys[1].name", "userP0-hobbys0-1")
+	keys.Add("usersP[1].hobbys[0].name", "userP1-hobbys1-0")
 
-	params = leafvein.newStructPtr(reflect.TypeOf(params), keys).Elem().Interface().(struct {
-		Users  []User
-		TagStr []string
-	})
-	// leafvein.setStructFieldValue(reflect.ValueOf(&params), "users[0].name", "sl_name_1")
-	// fmt.Println(params.Users[0].Name)
+	refValue := leafvein.newStructPtr(reflect.TypeOf(Params{}), keys)
+
+	// str := "userP0-hobbys0-0"
+	// leafvein.setStructFieldValue(refValue, "usersP[0].hobbys[0].name", &str)
+
+	//	转换类型然后进行比较判断
+	params := refValue.Interface().(*Params)
+
+	fmt.Println(len(params.UsersP[0].Hobbys))
+}
+
+//	设置结构字段测试
+func funcSetStructFieldValue() *Params {
+	leafvein := &sfLeafvein{}
+
+	keys := url.Values{}
+	keys.Add("users[0].hobbys[0].name", "hobbys0-0")
+	keys.Add("users[0].hobbys[1].name", "hobbys0-1")
+	keys.Add("users[0].hobbys[2].name", "hobbys0-2")
+	keys.Add("users[1].hobbys[0].name", "hobbys1-0")
+	keys.Add("users[1].hobbys[1].name", "hobbys1-1")
+	keys.Add("users[0].typeP.typeName", "0-type-1")
+	keys.Add("users[0].type.typeName", "0-type-2")
+	keys.Add("users[1].hobbysP[0].name", "hobbys1-0")
+	keys.Add("users[1].hobbysP[1].name", "hobbys1-1")
+	keys.Add("oneUser.userName", "oneName")
+	keys.Add("oneUser.userPwd", "onePwd")
+
+	start := time.Now()
+	refValue := leafvein.newStructPtr(reflect.TypeOf(Params{}), keys)
+	fmt.Println("newStructPtr time :", time.Now().Sub(start))
+	start = time.Now()
 	for k, v := range keys {
-		leafvein.setStructFieldValue(reflect.ValueOf(&params), k, v[0])
+		leafvein.setStructFieldValue(refValue, k, v[0])
+	}
+	fmt.Println("setStructFieldValue time :", time.Now().Sub(start))
+	return refValue.Interface().(*Params)
+}
+
+//	测试设置结构字段直
+func TestSetStructFieldValue(t *testing.T) {
+	start := time.Now()
+	params := funcSetStructFieldValue()
+	fmt.Println("time :", time.Now().Sub(start))
+
+	if nil == params.OneUserP {
+		t.Error("nil != params.OneUserP 初始化错误")
+		return
 	}
 
-	leafvein.setStructFieldValue(reflect.ValueOf(&params), "users[0].File", multipart.FileHeader{Filename: "fileName-sf"})
-	leafvein.setStructFieldValue(reflect.ValueOf(&params), "users[0].Files[0]", multipart.FileHeader{Filename: "fileName_array-sf"})
-	leafvein.setStructFieldValue(reflect.ValueOf(&params), "users[0].FilePrt", multipart.FileHeader{Filename: "fileName_prt-sf"})
-	files2 := make([]*multipart.FileHeader, 1, 1)
-	files2[0] = &multipart.FileHeader{Filename: "fileName_prt-sf"}
-	leafvein.setStructFieldValue(reflect.ValueOf(&params), "users[0].Files2", files2)
-
-	fmt.Println("----------------------------")
-	fmt.Println("Users-Count:", len(params.Users))
-	fmt.Println("tagStr-Count:", len(params.TagStr))
-	fmt.Println(" ")
-	for _, v := range params.Users {
-		fmt.Println("file.Filename:", v.File.Filename)
-		fmt.Println("files:", v.Files)
-		for _, v2 := range v.Files2 {
-			fmt.Println("files2:", v2)
-		}
-		fmt.Println("fileprt.Filename:", v.FilePrt.Filename)
-		fmt.Println("Name:", v.Name)
-		fmt.Println("TypeName:", v.Type.TypeName)
-		fmt.Println("TypeUUID:", v.Type.TypeUUID)
-		fmt.Println("TagName:", v.Type.Tag.TagName)
-		fmt.Println("   arrayNum:", len(*(v.Arrays)))
-		for _, v2 := range *(v.Arrays) {
-			fmt.Println("      ArrayUUID:", v2.ArrayUUID)
-			fmt.Println("           array.strs:num", len(v2.Strs))
-			for _, v3 := range v2.Strs {
-				fmt.Println("               Strs:", v3)
-			}
-
-		}
-
-		fmt.Println("...")
+	if 2 != len(params.Users) {
+		t.Error("2 != len(params.Users) 初始化的用户数量不正确")
+		return
 	}
-	fmt.Println("----------------------------")
-	for _, v := range params.TagStr {
-		fmt.Println(v)
-		fmt.Println("...")
+
+	if 3 != len(params.Users[0].Hobbys) {
+		t.Error("3 != len(params.Users[0].Hobbys) 初始化数量不正确")
+		return
+	}
+
+	if 2 != len(params.Users[1].HobbysP) {
+		t.Error("2 != len(params.Users[1].HobbysP 初始化数量不正确")
+		return
+	}
+
+	if "oneName" != params.OneUser.UserName {
+		t.Error("oneName != params.OneUser.UserName 设值不正确")
+		return
+	}
+
+	if "onePwd" != params.OneUser.UserPwd {
+		t.Error("onePwd != params.OneUser.UserPwd 设值不正确")
+		return
+	}
+
+	if "hobbys0-0" != params.Users[0].Hobbys[0].Name {
+		t.Error(`"hobbys0-0" != params.Users[0].Hobbys[0].Name`)
+		return
+	}
+
+	if "hobbys0-1" != params.Users[0].Hobbys[1].Name {
+		t.Error(`"hobbys0-1" != params.Users[0].Hobbys[1].Name`)
+		return
+	}
+
+	if "hobbys0-2" != params.Users[0].Hobbys[2].Name {
+		t.Error(`"hobbys0-2" != params.Users[0].Hobbys[2].Name`)
+		return
+	}
+
+	if "0-type-1" != params.Users[0].TypeP.TypeName {
+		t.Error(`""0-type-1" != params.Users[0].TypeP.TypeName`)
+		return
+	}
+
+	if "0-type-2" != params.Users[0].Type.TypeName {
+		t.Error(`""0-type-2" != params.Users[0].Type.TypeName`)
+		return
+	}
+
+	if "hobbys1-0" != params.Users[1].Hobbys[0].Name {
+		t.Error(`"hobbys1-0" != params.Users[1].Hobbys[0].Name`)
+		return
+	}
+
+	if "hobbys1-1" != params.Users[1].Hobbys[1].Name {
+		t.Error(`"hobbys1-1" != params.Users[1].Hobbys[1].Name`)
+		return
+	}
+}
+
+//	提供TestNewStructPtr和Benchmark_NewStructPtr进行测试
+func funcNewStructPtr() interface{} {
+
+	leafvein := &sfLeafvein{}
+
+	keys := url.Values{}
+	keys.Add("users[0].hobbys[0].name", "hobbys1")
+	keys.Add("users[0].hobbys[1].name", "hobbys1")
+	keys.Add("users[0].hobbys[2].name", "hobbys1")
+	keys.Add("users[1].hobbysP[0].name", "hobbys1")
+	keys.Add("users[1].hobbysP[1].name", "hobbys1")
+	keys.Add("usersP[0].hobbys[0].name", "hobbys1")
+	keys.Add("oneUser.userName", "oneName")
+	keys.Add("oneUser.userPwd", "onePwd")
+	keys.Add("oneUser.hobbys[0].names[0]", "one-0-hobbys-0-names-0")
+	keys.Add("oneUser.hobbys[0].names[1]", "one-0-hobbys-0-names-1")
+	keys.Add("oneUser.hobbys[0].names[2]", "one-0-hobbys-0-names-2")
+	keys.Add("oneUser.hobbys[1].names[0]", "one-0-hobbys-1-names-1")
+
+	return leafvein.newStructPtr(reflect.TypeOf(Params{}), keys).Interface()
+}
+
+//	测试创建结构里的嵌套内容
+func TestNewStructPtr(t *testing.T) {
+	start := time.Now()
+
+	params := funcNewStructPtr().(*Params)
+
+	//	TODO 测试速度有点担忧670.976us 最好控制在100us以内
+	fmt.Println("time:", time.Now().Sub(start))
+
+	if nil == params.OneUserP {
+		t.Error("nil != params.OneUserP 初始化错误")
+		return
+	}
+
+	if 2 != len(params.Users) {
+		t.Error("2 != len(params.Users) 初始化的用户数量不正确")
+		return
+	}
+
+	if 3 != len(params.Users[0].Hobbys) {
+		t.Error("3 != len(params.Users[0].Hobbys) 初始化数量不正确")
+		return
+	}
+
+	if 2 != len(params.Users[1].HobbysP) {
+		t.Error("2 != len(params.Users[1].HobbysP 初始化数量不正确")
+		return
+	}
+
+	if 2 != len(params.OneUser.Hobbys) {
+		t.Error("2 != len(params.OneUser.Hobbys) 初始化数量不正确")
+		return
+	}
+
+	if 3 != len(params.OneUser.Hobbys[0].Names) {
+		t.Error("3 != len(params.OneUser.Hobbys[0].Names) 初始化数量不正确")
+		return
+	}
+
+	if 1 != len(params.OneUser.Hobbys[1].Names) {
+		t.Error("1 != len(params.OneUser.Hobbys[1].Names) 初始化数量不正确")
+		return
+	}
+}
+
+//	速度测试new struct, 包含里面的指针结构类型和切片大小分配
+func Benchmark_NewStructPtr(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		params := funcNewStructPtr().(*Params)
+
+		if nil == params.OneUserP {
+			b.Error("nil != params.OneUserP 初始化错误")
+			return
+		}
+
+		if 2 != len(params.Users) {
+			b.Error("2 != len(params.Users) 初始化的用户数量不正确")
+			return
+		}
+
+		if 3 != len(params.Users[0].Hobbys) {
+			b.Error("3 != len(params.Users[0].Hobbys) 初始化数量不正确")
+			return
+		}
+
+		if 2 != len(params.Users[1].HobbysP) {
+			b.Error("2 != len(params.Users[1].HobbysP 初始化数量不正确")
+			return
+		}
+
+		if 2 != len(params.OneUser.Hobbys) {
+			b.Error("2 != len(params.OneUser.Hobbys) 初始化数量不正确")
+			return
+		}
+
+		if 3 != len(params.OneUser.Hobbys[0].Names) {
+			b.Error("3 != len(params.OneUser.Hobbys[0].Names) 初始化数量不正确")
+			return
+		}
+
+		if 1 != len(params.OneUser.Hobbys[1].Names) {
+			b.Error("1 != len(params.OneUser.Hobbys[1].Names) 初始化数量不正确")
+			return
+		}
+
 	}
 }

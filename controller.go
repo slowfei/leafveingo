@@ -165,10 +165,11 @@ func (lv *sfLeafvein) parseFormParams(req *http.Request) (
 				statusCode = Status400
 				return
 			}
+
 			// ParseMultipartForm()解析已经调用了ParseForm()
 			urlValues = url.Values(req.MultipartForm.Value)
 
-			if 0 < len(req.MultipartForm.File) {
+			if nil != req.MultipartForm && 0 < len(req.MultipartForm.File) {
 				for k, v := range req.MultipartForm.File {
 					//	添加空字符串的主要目的是为了能够在创建结构时初始化切片的数量
 					urlValues.Set(k, "")
