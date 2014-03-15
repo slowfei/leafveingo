@@ -220,8 +220,8 @@ func testRquestGetSession(t *testing.T) {
 
 	//	并发数量别乱调，小心系统崩溃
 	var maxlifeTime int32 = 10 //	session最大有效时间
-	forNum := 10               //	进行多少次并发
-	goNum := 10                //	每次并发多少
+	forNum := 1000             //	进行多少次并发
+	goNum := 100               //	每次并发多少
 	wgNum := goNum * forNum
 	wg := sync.WaitGroup{}
 	wg.Add(wgNum)
@@ -320,7 +320,7 @@ func testRquestGetSession(t *testing.T) {
 	}
 
 	wg.Wait()
-	time.Sleep(time.Duration(10) * time.Second)
+	time.Sleep(time.Duration(30) * time.Second)
 
 	//	等待GC最后一次的执行
 	if sm.IsGC() {
@@ -359,7 +359,8 @@ func testRquestGetSession(t *testing.T) {
 	//	进行了多少次GetSession
 	fmt.Println("GetSession(...) num:", getSessNum)
 	fmt.Println("GetSession(...) Error num:", errorNum)
-	//	计算创建的session
+
+	//	计算创建的session，创建数量与删除数是一致的，如果出现不一致则需要进一步测试，不一致肯定是有错误的。
 	sessionCreateNum := len(sessCreateMap)
 	fmt.Println("create session num:", sessionCreateNum)
 	fmt.Println("delete session num:", delSessCount)
