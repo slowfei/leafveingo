@@ -79,11 +79,7 @@ func (arc *RouterController) ForumJson(params struct {
 	Bid int
 	Tid int
 }) interface{} {
-	j, e := leafveingo.BodyJson(params)
-	if nil != e {
-		return e.Error()
-	}
-	return j
+	return leafveingo.BodyJson(params)
 }
 
 func (arc *RouterController) Thread(params struct {

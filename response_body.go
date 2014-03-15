@@ -59,8 +59,16 @@ func BodyHtml(html string) HtmlOut {
 }
 
 //	out json text, application/json
-func BodyJson(value interface{}) (SFJson.Json, error) {
-	return SFJson.NewJson(value, "", "")
+func BodyJson(value interface{}) SFJson.Json {
+
+	json, error := SFJson.NewJson(value, "", "")
+
+	if nil != error {
+		lvLog.Error("BodyJson json error:%v", error)
+		json = SFJson.NewJsonNil(true)
+	}
+
+	return json
 }
 
 //	out []byte

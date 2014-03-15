@@ -46,17 +46,13 @@ func (r *ReturnParamController) Json(params struct {
 	t2 := TStruct{"2", "slowfei_2"}
 
 	var j SFJson.Json
-	var e error
 
 	if params.T == 1 {
-		j, e = leafveingo.BodyJson([]TStruct{t, t2})
+		j = leafveingo.BodyJson([]TStruct{t, t2})
 	} else {
-		j, e = leafveingo.BodyJson(t)
+		j = leafveingo.BodyJson(t)
 	}
 
-	if nil != e {
-		return e.Error()
-	}
 	return j
 }
 

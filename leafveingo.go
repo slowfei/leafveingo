@@ -82,7 +82,6 @@ var (
 
 func init() {
 	flag.BoolVar(&_flagDeveloper, "devel", false, "developer mode start.")
-
 }
 
 //	ISFLeafvein main interface
