@@ -173,20 +173,25 @@ func funcNewStructPtr() interface{} {
 	leafvein := &sfLeafvein{}
 
 	keys := url.Values{}
-	keys.Add("users[0].hobbys[0].name", "hobbys1")
+
+	keys.Add("oneUser.hobbys[0].names[2]", "one-0-hobbys-0-names-2")
 	keys.Add("users[0].hobbys[1].name", "hobbys1")
-	keys.Add("users[0].hobbys[2].name", "hobbys1")
+	keys.Add("oneUser.hobbys[0].names[1]", "one-0-hobbys-0-names-1")
+	keys.Add("users[1].hobbys[0].name", "hobbys1")
+	keys.Add("oneUser.hobbys[0].names[0]", "one-0-hobbys-0-names-0")
 	keys.Add("users[1].hobbysP[0].name", "hobbys1")
 	keys.Add("users[1].hobbysP[1].name", "hobbys1")
-	keys.Add("usersP[0].hobbys[0].name", "hobbys1")
+	keys.Add("users[0].hobbys[0].name", "hobbys1")
 	keys.Add("oneUser.userName", "oneName")
 	keys.Add("oneUser.userPwd", "onePwd")
-	keys.Add("oneUser.hobbys[0].names[0]", "one-0-hobbys-0-names-0")
-	keys.Add("oneUser.hobbys[0].names[1]", "one-0-hobbys-0-names-1")
-	keys.Add("oneUser.hobbys[0].names[2]", "one-0-hobbys-0-names-2")
+	keys.Add("users[0].hobbys[2].name", "hobbys1")
+	keys.Add("users[0].hobbysP[0].name", "hobbys1")
 	keys.Add("oneUser.hobbys[1].names[0]", "one-0-hobbys-1-names-1")
+	keys.Add("users[0].hobbys[0].name", "hobbys1")
 
-	return leafvein.newStructPtr(reflect.TypeOf(Params{}), keys).Interface()
+	rt := reflect.TypeOf(Params{})
+	rv := leafvein.newStructPtr(rt, keys)
+	return rv.Interface()
 }
 
 //	测试创建结构里的嵌套内容
@@ -195,8 +200,7 @@ func TestNewStructPtr(t *testing.T) {
 
 	params := funcNewStructPtr().(*Params)
 
-	//	TODO 测试速度有点担忧670.976us 最好控制在100us以内
-	fmt.Println("time:", time.Now().Sub(start))
+	fmt.Println("执行newStructPtr速度:", time.Now().Sub(start))
 
 	if nil == params.OneUserP {
 		t.Error("nil != params.OneUserP 初始化错误")
@@ -213,8 +217,18 @@ func TestNewStructPtr(t *testing.T) {
 		return
 	}
 
+	if 1 != len(params.Users[0].HobbysP) {
+		t.Error("1 != len(params.Users[0].HobbysP 初始化数量不正确")
+		return
+	}
+
 	if 2 != len(params.Users[1].HobbysP) {
 		t.Error("2 != len(params.Users[1].HobbysP 初始化数量不正确")
+		return
+	}
+
+	if 1 != len(params.Users[1].Hobbys) {
+		t.Error("1 != len(params.Users[1].Hobbys 初始化数量不正确")
 		return
 	}
 
@@ -254,8 +268,18 @@ func Benchmark_NewStructPtr(b *testing.B) {
 			return
 		}
 
+		if 1 != len(params.Users[0].HobbysP) {
+			b.Error("1 != len(params.Users[0].HobbysP 初始化数量不正确")
+			return
+		}
+
 		if 2 != len(params.Users[1].HobbysP) {
 			b.Error("2 != len(params.Users[1].HobbysP 初始化数量不正确")
+			return
+		}
+
+		if 1 != len(params.Users[1].Hobbys) {
+			b.Error("1 != len(params.Users[1].Hobbys 初始化数量不正确")
 			return
 		}
 

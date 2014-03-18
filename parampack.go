@@ -21,7 +21,6 @@
 package leafveingo
 
 import (
-	// "fmt"
 	"github.com/slowfei/gosfcore/utils/reflect"
 	"net/url"
 	"reflect"
@@ -177,6 +176,7 @@ func (lv *sfLeafvein) setStructFieldValue(sutValue reflect.Value, fieldName stri
 	}
 }
 
+//
 //	根据url和form参数信息创建一个struct体，如果存在集合结构会根据form参数信息make分配切片大小。
 //
 //	@param structType 需要操作的的结构
@@ -196,80 +196,108 @@ func (lv *sfLeafvein) newStructPtr(structType reflect.Type, urlValues url.Values
 		return structValue
 	}
 
-	//	递归函数，用于遍历filed，根据类型初始化指针与数组
-	var findFiledFunc func(structV reflect.Value, layerLevel int, joinFieldName string)
-	//	设置slice的大小
-	var setSliceSizeFunc func(value reflect.Value, fieldName string, layerLevel int, joinFieldName string)
+	//	begin 分析数组	TODO 需要调整集合下的集合 type[0].tmpe[0]
+	arraySizeMap := make(map[string]int) //	key = jsonfiledname ,value = array size
 
-	//  记录当前数组操作的层的级别和数组的下标
-	crtArrayLayerLlIndex := make(map[int]int)
+	for k, _ := range urlValues {
+		//	存储(oneUser.hobbys.names)操作的连接名 如果存在集合则存储为key
+		tempJoinName := ""
 
-	setSliceSizeFunc = func(value reflect.Value, fieldName string, layerLevel int, joinFieldName string) {
+		fields := strings.Split(k, ".")
 
-		if 0 < len(urlValues) && reflect.Slice == reflect.Indirect(value).Kind() {
-			//	如果是slice类型则根据form的name与递归连接的字段名进行比较来统计需要make的slice size
+		for _, field := range fields {
 
-			//	存储相同的切片标识
-			sliceSizeMap := make(map[string]bool)
+			fieldLower := strings.ToLower(field)
 
-			for k, _ := range urlValues {
+			strIndex := _arrayTagRex.FindString(fieldLower)
+			if 0 != len(strIndex) {
+				intIndex, err := strconv.Atoi(strIndex[1 : len(strIndex)-1])
+				if nil == err {
 
-				//	由于joinFieldName 是根据结构的字段名进行拼接的，所以在操作form的name(参数名)时需要去除"[\d]"集合的标识来进行比较
-				paramName := _arrayTagRex.ReplaceAllString(k, "")
+					//	这里为key做准备
+					tempJoinName += fieldLower[:len(fieldLower)-len(strIndex)]
 
-				//	根据递归级别分割paramName,以便与joinFieldName进行比较。
-				//	因为有可能paramName的级别大于joinFieldName
-				index := -1
-				levelIndex := -1 // 由于级别是从0开始，所以-1
-				for i := 0; i < len(paramName); i++ {
-					if paramName[i] == '.' {
-						levelIndex++
-					}
-					if levelIndex == layerLevel {
-						index = i
-						break
-					}
-				}
+					//	由于下标是从0开始计算，所以需要+1作为 array size
+					intIndex += 1
 
-				if -1 < index {
-					paramName = paramName[:index]
-				}
+					if sizeIndex, ok := arraySizeMap[tempJoinName]; ok {
 
-				//	比较并存储集合标识的参数名
-				if 0 != len(paramName) && strings.ToLower(paramName) == strings.ToLower(joinFieldName) {
-					//	处理相同的集合标识
-
-					keySplits := strings.Split(k, ".")
-
-					if layerLevel < len(keySplits) {
-
-						//	验证上级的数组元素是否为当前记录的操作下标
-						//	这里处理的可能性是集合下的元素为集合类型oneUser.hobbys[1].names[0]
-						//	如果不进行处理当参数字段为oneUser.hobbys[0].names[0]的时候就会出现相同的子集合个数
-						if vIndex, ok := crtArrayLayerLlIndex[layerLevel-1]; ok {
-							layerFieldKey := keySplits[layerLevel-1]
-							strIndex := _arrayTagRex.FindString(layerFieldKey)
-							if 0 == len(strIndex) {
-								continue
-							}
-							intIndex, e := strconv.Atoi(strIndex[1 : len(strIndex)-1])
-							if nil != e || intIndex != vIndex {
-								continue
-							}
+						if sizeIndex < intIndex {
+							arraySizeMap[tempJoinName] = intIndex
 						}
-
-						sliceSizeMap[keySplits[layerLevel]] = true
+					} else {
+						arraySizeMap[tempJoinName] = intIndex
 					}
+
+					//	由于可能存在数组下还存在集合（temp[0].temp2[0]），所以继续累加"[index]."继续执行。
+					tempJoinName += strIndex + "."
+				} else {
+					//	进入到这部基本上是获取的 "[ 错误下标 ]" 才导致的，所欲当没有下标出现，继续累加
+					tempJoinName += fieldLower + "."
 				}
+			} else {
+				tempJoinName += fieldLower + "."
 			}
 
-			sliceSize := len(sliceSizeMap)
-			if 0 < sliceSize {
-				valueElem := reflect.Indirect(value)
+		}
+	}
+	//	end 分析数组
+
+	//	执行递归子字段操作
+	lv.newStructFindFiled(structValue, "", arraySizeMap)
+
+	return structValue
+}
+
+//
+//	创建结构体递归遍历子字段操作
+//
+//	@param structV			递归操作字段
+//	@param joinFieldName	字段连接名
+//	@param arraySizeMap		解析后的集合数量设值map
+//
+//
+func (lv *sfLeafvein) newStructFindFiled(structV reflect.Value, joinFieldName string, arraySizeMap map[string]int) {
+	structV = reflect.Indirect(structV)
+	if reflect.Struct != structV.Kind() {
+		return
+	}
+
+	//	遍历结构字段寻找需要初始化的slice
+	filedCount := structV.NumField()
+	for i := 0; i < filedCount; i++ {
+		childField := structV.Field(i)
+		childFieldType := childField.Type()
+		childFieldName := structV.Type().Field(i).Name
+
+		if !childField.CanSet() {
+			continue
+		}
+
+		if 0 != len(joinFieldName) && '.' != joinFieldName[len(joinFieldName)-1] {
+			joinFieldName += "."
+		}
+
+		if reflect.Ptr == childFieldType.Kind() && childField.IsNil() {
+			//	初始化子结构指针的操作
+			childField.Set(reflect.New(childField.Type().Elem()))
+		}
+
+		switch reflect.Indirect(childField).Kind() {
+		case reflect.Struct:
+			if !lv.filterParamPackStructType(childField.Type()) {
+				lv.newStructFindFiled(childField, joinFieldName+childFieldName, arraySizeMap)
+			}
+		case reflect.Slice:
+
+			tempJoinName := joinFieldName + childFieldName
+
+			if sliceSize, ok := arraySizeMap[strings.ToLower(tempJoinName)]; ok {
+
+				valueElem := reflect.Indirect(childField)
 				valueElem.Set(reflect.MakeSlice(valueElem.Type(), sliceSize, sliceSize))
 
 				//	继续执行集合子元素的遍历
-				//	reflect.Struct == valueElem.Index(0).Kind() &&
 				if !lv.filterParamPackStructType(valueElem.Type()) {
 					for j := 0; j < sliceSize; j++ {
 						childIndex := valueElem.Index(j)
@@ -278,58 +306,14 @@ func (lv *sfLeafvein) newStructPtr(structType reflect.Type, urlValues url.Values
 							//	初始化子元素指针的操作
 							childIndex.Set(reflect.New(childIndex.Type().Elem()))
 						}
-						//	记录当前操作层级的集合下标，以便在递归的时候能够识别出当前操作下标进行判断
-						crtArrayLayerLlIndex[layerLevel] = j
-						findFiledFunc(childIndex, layerLevel+1, joinFieldName)
+
+						//	当前由于是数组类型，所以传递连接名的时候加上"[index]"下标往下进行操作
+						tempJoinName = joinFieldName + childFieldName + "[" + strconv.Itoa(j) + "]"
+
+						lv.newStructFindFiled(childIndex, tempJoinName, arraySizeMap)
 					}
-					delete(crtArrayLayerLlIndex, layerLevel)
 				}
-
 			}
-
 		}
-
 	}
-
-	findFiledFunc = func(structV reflect.Value, layerLevel int, joinFieldName string) {
-		structV = reflect.Indirect(structV)
-		if reflect.Struct != structV.Kind() {
-			return
-		}
-
-		if 0 != len(joinFieldName) {
-			joinFieldName += "."
-		}
-
-		//	遍历结构字段寻找需要初始化的slice
-		filedCount := structV.NumField()
-		for i := 0; i < filedCount; i++ {
-			childField := structV.Field(i)
-			childFieldType := childField.Type()
-			childFieldName := structV.Type().Field(i).Name
-
-			if !childField.CanSet() {
-				continue
-			}
-
-			if reflect.Ptr == childFieldType.Kind() && childField.IsNil() {
-				//	初始化子结构指针的操作
-				childField.Set(reflect.New(childField.Type().Elem()))
-			}
-
-			switch reflect.Indirect(childField).Kind() {
-			case reflect.Struct:
-				if !lv.filterParamPackStructType(childField.Type()) {
-					findFiledFunc(childField, layerLevel+1, joinFieldName+childFieldName)
-				}
-			case reflect.Slice:
-				setSliceSizeFunc(childField, childFieldName, layerLevel, joinFieldName+childFieldName)
-			}
-		}
-
-	}
-	//	执行调用
-	findFiledFunc(structValue, 0, "")
-
-	return structValue
 }

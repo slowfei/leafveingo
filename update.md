@@ -17,6 +17,9 @@ Leafveingo update log
 1. 配置文件功能
 > *	增加了leafveingo的配置功能
 
+1. 控制器参数
+> * 优化了控制器参数新建结构体的速度(newStructPtr)
+
 
 
 -----------
