@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-24
-//  Update on 2013-10-23
+//  Update on 2014-06-12
 //  Email  slowfei@foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -70,11 +70,12 @@ const (
 )
 
 var (
-	_thisSessionManager *HttpSessionManager
-	_ipFilterChar       = strings.NewReplacer("[", "", "]", "")
-	ErrCookieWrite      = errors.New("cookie can not write...")
-	ErrIPValidateFail   = "ip information can not verified :%v"
-	thisLog             = SFLog.NewLogger("LVSession")
+	ErrSessionManagerFree = errors.New("session manager is freed")
+	ErrCookieWrite        = errors.New("cookie can not write...")
+	ErrIPValidateFail     = "ip information can not verified :%v"
+
+	_ipFilterChar = strings.NewReplacer("[", "", "]", "")
+	thisLog       = SFLog.NewLogger("LVSession")
 )
 
 //	session manager
@@ -97,41 +98,98 @@ type HttpSessionManager struct {
 	sessionDeleteNum       int64                       // 当前session删除的总数量
 	isGC                   bool                        // 是否正在执行GC操作
 	testing                bool                        // 标识测试使用
+	isFree                 bool                        // 记录是否已经操作释放
 }
 
-//	get global session manager
-//	@autoGC 是否开启自动清理过期session的操作，如果不开启则需要手动进行GC处理。
-func SharedSessionManager(autoGC bool) *HttpSessionManager {
-	return SharedSessionManagerAtGCTime(DEFAULT_SCAN_GC_TIME, autoGC)
+/**
+ *	new session manager
+ *
+ *	@param autoGC		is auto gc
+ */
+func NewSessionManager(autoGC bool) *HttpSessionManager {
+	return NewSessionManagerAtGCTime(DEFAULT_SCAN_GC_TIME, autoGC)
 }
 
-// get global session manager test use
-//	@gcTimeSecond 自动GC操作的间隔时间
-func SharedSessionManagerAtGCTime(gcTimeSecond int64, autoGC bool) *HttpSessionManager {
-	if nil == _thisSessionManager {
-		sm := HttpSessionManager{mapSessions: make(map[string]*list.Element), listRank: make(map[int32]*list.List)}
-		sm.scanGCTime = gcTimeSecond
-		sm.sidType = SIDTypeRandomUUID
-		sm.tempSessMaxlifeTime = TEMP_SESSION_MAXLIFE_TIME
-		sm.testing = false
-		sm.isGC = false
-		sm.CookieSecure = false
-		sm.CookieMaxAge = 0
-		sm.CookieTokenHash = sha256.New
-		sm.CookieTokenRandLen = COOKIE_TOKEN_KEY_RAND_LEN
-		sm.CookieTokenMaxlifeTime = COOKIE_TOKEN_MAXLIFE_TIME
+/**
+ *	new session manager
+ *
+ *	@param gcTimeSecond	gc operate time, min 60 second
+ *	@param autoGC		is auto gc
+ */
+func NewSessionManagerAtGCTime(gcTimeSecond int64, autoGC bool) *HttpSessionManager {
 
-		keyBuf := make([]byte, GLOBAL_TOKEN_KEY_LEN)
-		SFRandUtil.RandBits(keyBuf)
-		sm.globalTokenKey = keyBuf
+	if 60 > gcTimeSecond {
+		gcTimeSecond = 60
+	}
 
-		_thisSessionManager = &sm
+	sm := &HttpSessionManager{mapSessions: make(map[string]*list.Element), listRank: make(map[int32]*list.List)}
+	sm.scanGCTime = gcTimeSecond
+	sm.sidType = SIDTypeRandomUUID
+	sm.tempSessMaxlifeTime = TEMP_SESSION_MAXLIFE_TIME
+	sm.testing = false
+	sm.isGC = false
+	sm.CookieSecure = false
+	sm.CookieMaxAge = 0
+	sm.CookieTokenHash = sha256.New
+	sm.CookieTokenRandLen = COOKIE_TOKEN_KEY_RAND_LEN
+	sm.CookieTokenMaxlifeTime = COOKIE_TOKEN_MAXLIFE_TIME
 
-		if autoGC {
-			go _thisSessionManager.autoGC()
+	keyBuf := make([]byte, GLOBAL_TOKEN_KEY_LEN)
+	SFRandUtil.RandBits(keyBuf)
+	sm.globalTokenKey = keyBuf
+
+	if autoGC {
+		go sm.autoGC()
+	}
+
+	return sm
+}
+
+/**
+ *	free session manager
+ *	will stop auto gc, clear all http session
+ *
+ */
+func (sm *HttpSessionManager) Free() {
+	sm.isFree = true
+
+	//	stop auto gc
+
+	//	remove all http session
+	sessionNum := 0
+	for _, lr := range sm.listRank {
+
+		var ePTemp *list.Element = nil
+		for eP := lr.Back(); nil != eP; eP = ePTemp {
+
+			session := eP.Value.(*httpSession)
+			session.sessionManager = nil
+
+			//	如果不使用temp存储，eP被删除了还怎么指向Prev呢？
+			//	所以呢，就使用一个temp进行存储Prev一个elem
+			ePTemp = eP.Prev()
+
+			//	如果maxlifeTime = -1 表示从DeleteSession删除后设置的，那时已经调用了一次函数了，所以这里不需要在调用了。
+			if 0 != len(sm.invalidHandlerFuncs) && -1 != session.maxlifeTime {
+				//	由于如果调用的函数占用时间久会影响GC的操作。所以copy一个session去给调用者执行其他的操作。
+				//	这样做的目的也不影响GC，也不影响用户的操作，反正也是一个即将废除的session
+				copySess := new(httpSession)
+				*copySess = *session
+				for _, f := range sm.invalidHandlerFuncs {
+					go f(copySess)
+				}
+			}
+
+			delete(sm.mapSessions, session.uid)
+			lr.Remove(eP)
+
+			sessionNum++
 		}
 	}
-	return _thisSessionManager
+
+	if !sm.testing {
+		thisLog.Info("free remove session number: %i", sessionNum)
+	}
 }
 
 //	获取session，根据cookie会自动进行创建
@@ -141,6 +199,11 @@ func SharedSessionManagerAtGCTime(gcTimeSecond int64, autoGC bool) *HttpSessionM
 //	@maxlifeTime	session的最大有效时间，秒为单位。
 //	@resetToken		是否重新设置cookie session token
 func (sm *HttpSessionManager) GetSession(rw http.ResponseWriter, req *http.Request, maxlifeTime int32, resetToken bool) (HttpSession, error) {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return nil, ErrSessionManagerFree
+	}
 
 	var session *httpSession = nil
 
@@ -402,6 +465,7 @@ func (sm *HttpSessionManager) createSession(maxlifeTime int32, request *http.Req
 	defer sm.rwmutex.Unlock()
 
 	s := &httpSession{}
+	s.sessionManager = sm
 	s.uid = b64
 	s.uidByte = []byte(uuid)
 	s.maxlifeTime = maxlifeTime
@@ -493,6 +557,12 @@ func (sm *HttpSessionManager) updateSessionRank(session *httpSession, mltSecond 
 }
 
 func (sm *HttpSessionManager) DeleteSession(uid string) {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return
+	}
+
 	sm.rwmutex.Lock()
 	defer sm.rwmutex.Unlock()
 
@@ -530,6 +600,12 @@ func (sm *HttpSessionManager) DeleteSession(uid string) {
 //	设置CG HttpSession清理的间隔时间，每段时间会进行一次HttpSession的清理
 //	@second	秒单位，大于或等于60m
 func (sm *HttpSessionManager) SetScanGCTime(second int64) {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return
+	}
+
 	if 60 <= second {
 		sm.scanGCTime = second
 	}
@@ -545,6 +621,12 @@ func (sm *HttpSessionManager) SetScanGCTime(second int64) {
 //	再第二次请求时如果cookie能够获取得到将还原调用者设置session的最大有效时间。
 //	@second 秒单位，大于或等于60m
 func (sm *HttpSessionManager) SetTempSessMaxlifeTime(second int32) {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return
+	}
+
 	if 60 <= second {
 		sm.tempSessMaxlifeTime = second
 	}
@@ -552,6 +634,12 @@ func (sm *HttpSessionManager) SetTempSessMaxlifeTime(second int32) {
 
 //	is contains session
 func (sm *HttpSessionManager) Contains(uid string) bool {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return false
+	}
+
 	sm.rwmutex.RLock()
 	defer sm.rwmutex.RUnlock()
 	_, ok := sm.mapSessions[uid]
@@ -560,6 +648,12 @@ func (sm *HttpSessionManager) Contains(uid string) bool {
 
 //	the create session total number
 func (sm *HttpSessionManager) SessionCreateNum() int64 {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return -1
+	}
+
 	sm.rwmutex.RLock()
 	defer sm.rwmutex.RUnlock()
 	return sm.sessionCreateNum
@@ -567,6 +661,12 @@ func (sm *HttpSessionManager) SessionCreateNum() int64 {
 
 //	the session effectiven number
 func (sm *HttpSessionManager) SessionEffectivenNum() int64 {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return -1
+	}
+
 	sm.rwmutex.RLock()
 	defer sm.rwmutex.RUnlock()
 	return int64(len(sm.mapSessions))
@@ -574,17 +674,35 @@ func (sm *HttpSessionManager) SessionEffectivenNum() int64 {
 
 // the delete session total number
 func (sm *HttpSessionManager) SessionDeleteNum() int64 {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return -1
+	}
+
 	return sm.sessionDeleteNum
 }
 
 //	get cookie token key
 func (sm *HttpSessionManager) GlobalTokenKey() []byte {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return nil
+	}
+
 	return sm.globalTokenKey
 }
 
 //	set cookie token key (len > 0)
 //	设置全局的token key，默认是使用 crypto/rand 进行生成的随机数
 func (sm *HttpSessionManager) SetGlobalTokenKey(key []byte) {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return
+	}
+
 	if 0 != len(key) {
 		sm.rwmutex.Lock()
 		defer sm.rwmutex.Unlock()
@@ -595,6 +713,11 @@ func (sm *HttpSessionManager) SetGlobalTokenKey(key []byte) {
 
 // GC operation is running
 func (sm *HttpSessionManager) IsGC() bool {
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return false
+	}
+
 	sm.rwmutex.RLock()
 	defer sm.rwmutex.RUnlock()
 	return sm.isGC
@@ -602,6 +725,12 @@ func (sm *HttpSessionManager) IsGC() bool {
 
 //	gc clear session
 func (sm *HttpSessionManager) GC() {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return
+	}
+
 	startCGTime := time.Now()
 	logInfo := "http session GC start :" + startCGTime.String()
 	isExecuteGC := false
@@ -620,8 +749,9 @@ func (sm *HttpSessionManager) GC() {
 				//	如果不使用temp存储，eP被删除了还怎么指向Prev呢？
 				//	所以呢，就使用一个temp进行存储Prev一个elem
 				ePTemp = eP.Prev()
-
 				isExecuteGC = true
+
+				session.sessionManager = nil
 
 				//	如果maxlifeTime = -1 表示从DeleteSession删除后设置的，那时已经调用了一次函数了，所以这里不需要在调用了。
 				if 0 != len(sm.invalidHandlerFuncs) && -1 != session.maxlifeTime {
@@ -669,6 +799,9 @@ func (sm *HttpSessionManager) autoGC() {
 
 	for {
 		<-time.After(time.Duration(sm.scanGCTime) * time.Second)
+		if sm.isFree {
+			break
+		}
 		sm.GC()
 	}
 
@@ -682,6 +815,12 @@ func (sm *HttpSessionManager) autoGC() {
 //				也可以根据自己需求，设置url, url必须能直接获取得到网络的IP信息不需要任何解析操作。
 //				由于IPUUID需要连接网络，出现获取不了或解析不了IP的情况下会抛出异常(panic)
 func (sm *HttpSessionManager) SetSIDType(t SIDType, urlIPApi string) {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return
+	}
+
 	switch t {
 	case SIDTypeRandomUUID:
 		sm.sidType = t
@@ -700,6 +839,12 @@ func (sm *HttpSessionManager) SetSIDType(t SIDType, urlIPApi string) {
 //	parameter session is copy value
 //
 func (sm *HttpSessionManager) AddSessionWillInvalidateHandlerFunc(handlerFunc func(session HttpSession)) {
+
+	if sm.isFree {
+		thisLog.Info(ErrSessionManagerFree.Error())
+		return
+	}
+
 	sm.invalidHandlerFuncs = append(sm.invalidHandlerFuncs, handlerFunc)
 }
 
@@ -722,6 +867,7 @@ type HttpSession interface {
 
 //	http session
 type httpSession struct {
+	sessionManager      *HttpSessionManager    // session manager
 	uid                 string                 // session id
 	uidByte             []byte                 // session id uuid byte
 	formToken           FormToken              // session form token, rand ( COOKIE_TOKEN_KEY_RAND_LEN bit)
@@ -759,7 +905,7 @@ func (s *httpSession) UID() string {
 }
 
 func (s *httpSession) CheckFormTokenSignature(signature string) bool {
-	if 0 == len(signature) {
+	if 0 == len(signature) || nil == s.sessionManager {
 		return false
 	}
 	signatureBuf, e := base64.URLEncoding.DecodeString(signature)
@@ -778,8 +924,8 @@ func (s *httpSession) CheckFormTokenSignature(signature string) bool {
 		}
 	}()
 
-	globalkey := _thisSessionManager.globalTokenKey
-	hashFunc := _thisSessionManager.CookieTokenHash
+	globalkey := s.sessionManager.globalTokenKey
+	hashFunc := s.sessionManager.CookieTokenHash
 
 	indexBuf := make([]byte, 2)
 	copy(indexBuf, signatureBuf[:2])
@@ -807,10 +953,15 @@ func (s *httpSession) CheckFormTokenSignature(signature string) bool {
 }
 
 func (s *httpSession) FormTokenSignature() string {
+
+	if nil == s.sessionManager {
+		return "session manager is freed"
+	}
+
 	//	这里直接使用cookie token设定的长度
-	randLen := _thisSessionManager.CookieTokenRandLen
-	globalkey := _thisSessionManager.globalTokenKey
-	hashFunc := _thisSessionManager.CookieTokenHash
+	randLen := s.sessionManager.CookieTokenRandLen
+	globalkey := s.sessionManager.globalTokenKey
+	hashFunc := s.sessionManager.CookieTokenHash
 
 	// s.rwmutex.Lock() // TODO
 	randToken := make([]byte, randLen)
@@ -879,12 +1030,20 @@ func (s *httpSession) MaxlifeTime() int32 {
 	return s.maxlifeTime
 }
 func (s *httpSession) SetMaxlifeTime(second int32) {
+	if nil == s.sessionManager {
+		return
+	}
+
 	if 10 <= second {
-		_thisSessionManager.updateSessionRank(s, second)
+		s.sessionManager.updateSessionRank(s, second)
 	}
 }
 func (s *httpSession) Invalidate() {
-	_thisSessionManager.DeleteSession(s.uid)
+	if nil == s.sessionManager {
+		return
+	}
+
+	s.sessionManager.DeleteSession(s.uid)
 }
 func (s *httpSession) AccessIP() net.IP {
 	return s.accessIP
