@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-24
-//  Update on 2013-10-23
+//  Update on 2014-06-12
 //  Email  slowfei@foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -43,8 +43,6 @@ const (
 )
 
 var (
-	// private
-	thisTemplate ITemplate
 
 	/*  根据顺序使用正则来去除html的换行和空格
 	TODO 在javascript中括号中的空格还未完全去除，此正则操作可能过于繁琐，还没有找到好的解决方案。
@@ -69,13 +67,10 @@ type TemplateValue struct {
 }
 
 // 获取模板对象
-func SharedTemplate() ITemplate {
-	if nil == thisTemplate {
-		t := lvtemplate{}
-		t.initPrivate()
-		thisTemplate = &t
-	}
-	return thisTemplate
+func NewTemplate() ITemplate {
+	t := new(lvtemplate)
+	t.initPrivate()
+	return t
 }
 
 //	new template value
