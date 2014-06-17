@@ -25,8 +25,47 @@ func (t TestImplResponse) Write([]byte) (int, error) {
 func (t TestImplResponse) WriteHeader(i int) {
 }
 
+/**
+ *	测试session manager的Free()
+ *	测试时间20秒，需要耐心等待
+ */
+func TestSessionManagerFree(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	sm := NewSessionManagerAtGCTime(1, true)
+
+	sm.testing = true
+
+	fmt.Println("sm free() testing...:", time.Now(), "\n")
+
+	go func() {
+
+		//	添加http session
+		for i := 1; i <= 10; i++ {
+			rw := TestImplResponse{}
+			req := http.Request{}
+			req.RemoteAddr = "128.0.0.1:8212"
+			req.Header = make(http.Header, 1)
+			req.Form = make(url.Values)
+			sm.tempSessMaxlifeTime = int32(i)
+			_, err := sm.GetSession(rw, &req, int32(i), false)
+			if nil != err {
+				fmt.Println("get session error:", err)
+			}
+		}
+
+		<-time.After(time.Duration(6) * time.Second)
+		fmt.Println("session manager start free()...:", time.Now())
+		sm.Free()
+	}()
+
+	time.Sleep(time.Duration(20) * time.Second)
+}
+
+/**
+ *	测试cookie 签名效验，这里操作修改特定的token字符，看看是否可以验证通过
+ */
 func TestCookieReplaceChar(t *testing.T) {
-	sm := SharedSessionManagerAtGCTime(10, true)
+	sm := NewSessionManagerAtGCTime(10, true)
 	// sm.CookieTokenHash = sha1.New
 	// rw := TestImplResponse{}
 	req := http.Request{}
@@ -66,8 +105,11 @@ func TestCookieReplaceChar(t *testing.T) {
 	fmt.Println("测试通过。")
 }
 
-func testCookieToken(t *testing.T) {
-	sm := SharedSessionManagerAtGCTime(10, true)
+/**
+ *	测试cookie token的验证操作
+ */
+func TestCookieToken(t *testing.T) {
+	sm := NewSessionManagerAtGCTime(10, true)
 	// sm.CookieTokenHash = sha1.New
 	// rw := TestImplResponse{}
 	req := http.Request{}
@@ -203,10 +245,13 @@ func testCookieToken(t *testing.T) {
 
 }
 
-func testRquestGetSession(t *testing.T) {
+/**
+ *	测试GetSession的并发情况
+ */
+func TestRquestGetSession(t *testing.T) {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	sm := SharedSessionManagerAtGCTime(1, true)
+	sm := NewSessionManagerAtGCTime(1, true)
 	sm.tempSessMaxlifeTime = 5
 	sm.testing = true
 

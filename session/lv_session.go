@@ -113,7 +113,7 @@ func NewSessionManager(autoGC bool) *HttpSessionManager {
 /**
  *	new session manager
  *
- *	@param gcTimeSecond	gc operate time, min 60 second
+ *	@param gcTimeSecond	gc operate time, minimum 60 second
  *	@param autoGC		is auto gc
  */
 func NewSessionManagerAtGCTime(gcTimeSecond int64, autoGC bool) *HttpSessionManager {
@@ -187,8 +187,8 @@ func (sm *HttpSessionManager) Free() {
 		}
 	}
 
-	if !sm.testing {
-		thisLog.Info("free remove session number: %i", sessionNum)
+	if sm.testing {
+		thisLog.Info("free remove session number: %v", sessionNum)
 	}
 }
 
@@ -794,12 +794,15 @@ func (sm *HttpSessionManager) GC() {
 	thisLog.Info(logInfo)
 }
 
-//	auto gc clear
+/**
+ *	auto gc run
+ */
 func (sm *HttpSessionManager) autoGC() {
 
 	for {
 		<-time.After(time.Duration(sm.scanGCTime) * time.Second)
 		if sm.isFree {
+			thisLog.Info("autoGC() has stopped.")
 			break
 		}
 		sm.GC()
