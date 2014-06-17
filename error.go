@@ -25,8 +25,8 @@ import (
 )
 
 var (
-	//	http session manager 已经关闭，没有启动到session
-	ErrHttpSessionManagerClosed = NewLeafveingoError("HttpSession manager has been closed.")
+	//	http session manager close status
+	ErrHttpSessionManagerClosed = NewLeafveingoError("HttpSession manager has been closed or not started.")
 
 	ErrControllerReturnParam    = NewLeafveingoError("controllers return type parameter error.")
 	ErrControllerReturnParamNum = NewLeafveingoError("controller returns the number of type parameters allowed only one.")
@@ -34,8 +34,8 @@ var (
 	//转发找不到控制器
 	ErrControllerDispatcherNotFound = NewLeafveingoError("dispatcher: controller not found router key:")
 
-	//	Leafveingo 没有进行初始化
-	ErrLeafveingoNotInit = NewLeafveingoError("Leafveingo not initialized.")
+	//	Leafvein app name repeat
+	ErrLeafveingoAppNameRepeat = NewLeafveingoError("Leafvein server app name repeat.")
 
 	//	Leafveingo 已经初始化
 	ErrLeafveingoHasbeenInit = NewLeafveingoError("Leafveingo Has been initialized.")
