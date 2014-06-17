@@ -12,11 +12,11 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
-//  Create on 2013-8-16
-//  Update on 2013-12-31
-//  Email  slowfei@foxmail.com
+//  Create on 2013-08-16
+//  Update on 2014-06-10
+//  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
-//	version 0.0.1.000
+//	version 0.0.2.000
 
 //	web框架leafveingo
 package leafveingo
@@ -48,7 +48,7 @@ import (
 const (
 
 	//	leafveingo version
-	VERSION string = "0.0.1.000"
+	VERSION string = "0.0.2.000"
 
 	//	controller default url request ("http://localhost:8080/") method
 	CONTROLLER_DEFAULT_METHOD = "Index"
@@ -70,340 +70,973 @@ const (
 )
 
 var (
-	//	一个变量的存储区域，用于存储已经初始化好的Leafvein
-	_thisLeafvein ISFLeafvein
 	//	开发模式命令
 	_flagDeveloper bool
-	//
-	_rexW = regexp.MustCompile("\\w+")
 
-	lvLog = SFLog.NewLogger("Leafveingo")
+	//	TODO Remove
+	// _rexW = regexp.MustCompile("\\w+")
+
+	//	init server memory list
+	_serverList []*LeafveinServer = nil
+
+	//	temp storage router
+
 )
 
 func init() {
 	flag.BoolVar(&_flagDeveloper, "devel", false, "developer mode start.")
 }
 
-//	ISFLeafvein main interface
-type ISFLeafvein interface {
-	//	start leafveingo
-	Start()
+//#pragma mark leafveingo func	----------------------------------------------------------------------------------------------------
 
-	//	close leafveingo
-	Close()
-	//	leafveion version info
-	Version() string
-
-	//	获取leafveingo的一个Handler, 方便在其他应用进行扩展leafveingo
-	//	get leafveingo handler, Easily be extended to other applications
-	//	@prefix	 url prefix
-	GetHandlerFunc(prefix string) (handler http.Handler, err error)
-
-	//	add controller
-	//
-	//	@routerKey 	需要访问url路由设置。 e.g.: / == http://127.0.0.1/; admin/ == http://127.0.0.1/admin/
-	//	@controller	控制器分为地址传递和值传递
-	//				值传递：
-	//				AddControllers("/Home/", HomeController{})
-	//				每次请求(http://127.0.0.1/home/)时 controller 都会根据设置的控制器类型新建立一个对象进行处理
-	//
-	//				地址传递：
-	//				AddControllers("/Admin/", &AdminController{})
-	//				跟值传递相反，每次请求时都会使用设置的控制器地址进行处理，应用结束也不会改变，每次请求控制器都不会改变内存地址
-	//				这里涉及到并发时同时使用一个内存地址处理的问题，不过目前还没有弄到锁，并发后期leafveingo会进行改进和处理。
-	AddController(routerKey string, controller interface{})
-
-	//	web application map
-	Application() SFHelper.Map
-
-	//	http session manager
-	HttpSessionManager() *LVSession.HttpSessionManager
-	//	is use session, default true
-	SetUseSession(b bool)
-	//	set is auto GC session clean work, default true
-	SetGCSession(b bool)
-
-	//	set http session maxlife time, unit second
-	//	default 1800 second(30 minute)
-	//	must be greater than 60 seconds
-	SetSessionMaxlifeTime(second int32)
-	SessionMaxlifeTime() int32
-
-	//	developer mode
-	IsDevel() bool
-	// is starting
-	IsStart() bool
-
-	//	current leafveingo the file operation directory
-	//	operatingDir 是根据 appName 建立的目录路径
-	OperatingDir() string
-
-	//	web directory, can read and write to the directory
-	//	primary storage html, css, js, image, zip the file
-	//	OperatingDir() created under the directory
-	//	default webRoot
-	//	@name "webRoot" "web"...
-	SetWebRootDir(name string)
-	WebRootDir() string
-
-	//	template directory, primary storage template file
-	//	OperatingDir() created under the directory
-	//	default template
-	//	@name	"template" "other" ...
-	SerTemplateDir(name string)
-	TemplateDir() string
-
-	//	set template suffix, default ".tpl"
-	SetTemplateSuffix(suffix string)
-	TemplateSuffix() string
-
-	//	set port
-	//	@port	8080|6060...
-	SetPort(port int)
-	Port() int
-
-	//	set file size upload
-	SetFileUploadSize(maxSize int64)
-	FileUploadSize() int64
-
-	//	set html encoding type, default utf-8
-	SetCharset(encode string)
-	Charset() string
-
-	// is ResponseWriter writer compress gizp...
-	// According Accept-Encoding select compress type
-	// default true
-	SetRespWriteCompress(b bool)
-	IsRespWriteCompress() bool
-
-	//	out html is compact remove (\t \n space) sign
-	//	only template file out use
-	//	default true
-	SetCompactHTML(compact bool)
-	IsCompactHTML() bool
-
-	//	set leafveingo http request supported suffixes. e.g.: (.go),(.html) ...
-	//	default nil, what form can access, the first is the default suffix
-	SetHTTPSuffixs(suffixs ...string)
-	HTTPSuffixs() []string
-
-	//	supported resource file suffixs, default ".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"
-	SetStaticFileSuffixs(suffixs ...string)
-	StaticFileSuffixs() []string
-
-	//	set server time out default 0. seconds = 10 = 10s
-	SetServerTimeout(seconds int64)
-	ServerTimeout() int64
-
-	//	http addr default 127.0.0.1
-	SetAddr(addr string)
-	Addr() string
-
-	//	custom app name. default LeafveingoWeb
-	SetAppName(name string)
-	AppName() string
-
-	//	custom app version
-	SetAppVersion(version string)
-	AppVersion() string
-
-	//	leafveingo config
-	Config() *Config
-
-	//	log config path
-	LogConfPath() string
-	SetLogConfPath(path string)
-
-	//	log channel size default 5000
-	LogChannelSize() int
-	SetLogChannelSize(size int)
-
-	/* private method*/
-
-	//	状态页面输出
-	statusPageExecute(wr io.Writer, value HttpStatusValue) error
+func SetLogManager(channelSize int) {
+	// SFLog.StartLogManager(lv.logChannelSize)
+	SFLog.StartLogManager(channelSize)
 }
 
-//	使用Leafvein，会将已经初始化好的ISFLeafvein进行同一返回，程序运行只初始化一次
-//	shared init leafveingo, running the program initializes only once
-func SharedLeafvein() ISFLeafvein {
-	if nil == _thisLeafvein {
-		var privatelv sfLeafvein = sfLeafvein{}
-		_thisLeafvein = &privatelv
-		privatelv.initPrivate()
-
+/**
+ *	by app name get leafvein server
+ *
+ *	@param appName
+ *	@return
+ */
+func GetServer(appName string) *LeafveinServer {
+	count := len(_serverList)
+	for i := 0; i < count; i++ {
+		server := _serverList[i]
+		if appName == server.AppName() {
+			return server
+		}
 	}
-	return _thisLeafvein
+	return nil
 }
 
-//	default ISFLeafvein interface impl
-type sfLeafvein struct {
-	/* 可重新更改参数 */
+/**
+ *	leafveion version info
+ *
+ *	@return
+ */
+func Version() string {
+	return VERSION
+}
 
-	//	app version
-	appVersion string
+/**
+ *	private add server
+ *
+ *	@param server
+ */
+func addServerList(server *LeafveinServer) {
+	if nil != GetServer(server.AppName()) {
+		panic(ErrLeafveingoAppNameRepeat)
+	}
+	_serverList = append(_serverList, server)
+}
 
-	// http url suffixs
-	suffixs []string
+//#pragma mark ServerOption struct	----------------------------------------------------------------------------------------------------
 
-	// supported static file suffixs, default ".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"
-	staticFileSuffixs []string
+/**
+ *	Leafvein Server option
+ *
+ *	use DefaultOption() see default value
+ */
+type ServerOption struct {
+	//  ip access 	"127.0.0.1" localhost access
+	// 	all address access
+	//  "192.168.?.?" 	specify access
+	//	default "127.0.0.1"
+	addr string
 
-	// html encode type, default utf-8
-	charset string
+	port       int    // ip port. default 8080
+	smgcTime   int64  // session manager gc operate time. 0 is not run session, minimum 60 second. default 300
+	configPath string // config file path, can set empty. default ""
+}
+
+/**
+ *	default server option value
+ */
+func DefaultOption() ServerOption {
+	option := ServerOption{}
+	option.addr = "127.0.0.1"
+	option.port = 8080
+	option.smgcTime = LVSession.DEFAULT_SCAN_GC_TIME
+	option.configPath = ""
+	return option
+}
+
+/**
+ *	set addr
+ */
+func (s *ServerOption) SetAddr(addr string) *ServerOption {
+	s.addr = addr
+	return s
+}
+
+/**
+ *	set port
+ */
+func (s *ServerOption) SetPort(port int) *ServerOption {
+	s.port = port
+	return s
+}
+
+/**
+ *	set session manager operate gc
+ */
+func (s *ServerOption) SetSMGCTime(second int64) *ServerOption {
+	s.smgcTime = second
+	return s
+}
+
+/**
+ *	set config file path
+ */
+func (s *ServerOption) SetConfigPath(path string) *ServerOption {
+	s.configPath = path
+	return s
+}
+
+/**
+ *	checked params
+ */
+func (s *ServerOption) checked() {
+	if 60 > s.smgcTime {
+		s.smgcTime = 60
+	}
+}
+
+//# mark LeafveinServer struct	----------------------------------------------------------------------------------------------------
+
+//
+//	Leafvein Http Server
+//
+type LeafveinServer struct {
+	/* #mark  require params ******************/
+
+	appName string // application info default LeafveingoWeb
+	addr    string // "127.0.0.1" | "" | "192.168.?.?"
+	port    int    // 8080 | 8090 ...
+
+	/* #mark optional params, see detailed defaults value to config.go _defaultConfigJson ******************/
+
+	appVersion         string   // app version
+	fileUploadSize     int64    // file size upload
+	charset            string   // html encode type
+	suffixs            []string // http url suffixs
+	staticFileSuffixs  []string // supported static file suffixs
+	serverTimeout      int64    // server time out, default 0
+	sessionMaxlifeTime int32    // http session maxlife time, unit second. use session set
+
+	templateSuffix string // template suffix
+	isCompactHTML  bool   // is Compact HTML, 默认true
+
+	logConfigPath string // log config path
+	logGroup      string // log group name
 
 	// is ResponseWriter writer compress gizp...
 	// According Accept-Encoding select compress type
 	// default true
 	isRespWriteCompress bool
 
-	//	file size upload 32M
-	fileUploadSize int64
+	userData map[string]string // user custom config other info
 
-	//	http session maxlife time, unit second
-	//	default 1800 second(30 minute)
-	sessionMaxlifeTime int32
+	/* #mark router patams ******************/
 
-	/* 需要重新启动程序才能更改参数 */
+	// all router storage map and router keys
+	routers    map[string]IRouter
+	routerKeys []string
 
-	// application info default LeafveingoWeb
-	appName string
+	/* #mark system patams ******************/
 
-	// server time out, default 0
-	serverTimeout int64
-
-	// default 8080
-	port int
-	// http addr default 127.0.0.1
-	addr string
-
-	//	web directory, can read and write to the directory
-	//	primary storage html, css, js, image, zip the file
-	webRootDir string
-	//	template dir, storage template file
-	templateDir string
-
-	//	template suffix, default ".tpl"
-	templateSuffix string
-
-	isUseSession bool // is use session
-	isGCSession  bool // is auto GC session
-
-	//	log config path
-	logConfPath string
-	//	log channel size default 5000
-	logChannelSize int
-
-	/* 对象参数 */
-
-	//	application
-	application SFHelper.Map
-
-	//	template
-	template LVTemplate.ITemplate
-	// is Compact HTML, 默认true
-	isCompactHTML bool
-
-	//	http session manager
-	sessionManager *LVSession.HttpSessionManager
-
-	// all controller storage map and router keys
-	controllers    map[string]reflect.Value
-	controllerKeys []string
-
-	// AdeRouterController interface storage
-	controllerArcImpls map[string]AdeRouterController
+	application    SFHelper.Map                  //	application
+	sessionManager *LVSession.HttpSessionManager //	http session manager
+	template       LVTemplate.ITemplate          //	template
+	log            *SFLog.SFLogger
 
 	//	current leafveingo the file operation directory
 	//	operatingDir 是根据 appName 建立的目录路径
 	operatingDir string
 
-	//	leafveingo config
-	config *Config
+	prefix   string       // http url prefix
+	listener net.Listener // current http listener
+	isDevel  bool         // developer mode
+	isStart  bool         // is start
 
-	/*	private use */
-
-	//	http url prefix
-	prefix string
-	//	current http listener
-	listener net.Listener
-	//	developer mode
-	isDevel bool
-	//	is start
-	isStart bool
 }
 
-//	sfLeafvein private init
-func (lv *sfLeafvein) initPrivate() {
-	lv.controllers = make(map[string]reflect.Value)
-	lv.controllerArcImpls = make(map[string]AdeRouterController)
-	lv.template = LVTemplate.SharedTemplate()
-	lv.application = SFHelper.NewMap()
-	lv.isStart = false
-	lv.config = new(Config)
+//# mark LeafveinServer init	----------------------------------------------------------------------------------------------------
 
-	loadConfigByJson([]byte(_defaultConfigJson))
+/**
+ *	new http server
+ *
+ *	@param appName		application name not is null
+ *	@param option		server other option
+ */
+func NewLeafveinServer(appName string, option ServerOption) *LeafveinServer {
+	if 0 == len(appName) {
+		return nil
+	}
+	option.checked()
+
+	server := &LeafveinServer{appName: appName, addr: option.addr, port: option.port}
+
+	//	set other params
+	server.initPrivate(option)
+
+	//	add to server list
+	addServerList(server)
+
+	return server
+}
+
+/**
+ *	init optional params
+ */
+func (lv *LeafveinServer) initPrivate(option ServerOption) {
+
+	server.configLoadDefault()
+
+	//	config handle
+	if 0 != len(option.configPath) {
+		config, err := configLoadByFilepath(option.configPath)
+		if nil != err {
+			panic("error init load config: %v", NewLeafveingoError(err.Error()))
+			return
+		}
+		lv.configReload(config)
+	}
+
+	lv.isStart = false
+
+	lv.routers = make(map[string]IRouter)
+
+	lv.application = SFHelper.NewMap()
 
 	lv.operatingDir = filepath.Join(SFFileManager.GetExecDir(), lv.appName)
 
+	lv.template = LVTemplate.NewTemplate()
 	lv.template.SetBaseDir(lv.TemplateDir())
-	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, lv.Version)
+	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, Version)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_NAME, lv.AppName)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_VERSION, lv.AppVersion)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_IS_DEVEL, lv.IsDevel)
 
+	//	start session manager
+	if 60 <= option.smgcTime {
+		lv.SetHttpSessionManager(LVSession.NewSessionManagerAtGCTime(option.smgcTime, true))
+	}
+
 }
 
-//	主http响应函数
-func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+//# mark LeafveinServer private method -------------------------------------------------------------------------------------------
+
+/**
+ *	load default config info
+ */
+func (lv *LeafveinServer) configLoadDefault() {
+	config, err := configLoadByJson(_defaultConfigJson)
+	if nil != err {
+		panic("error load default config: %v", NewLeafveingoError(err.Error()))
+		return
+	}
+	lv.configReload(config)
+}
+
+/**
+ *	reload config info
+ *
+ *	@param cf
+ */
+func (lv *LeafveinServer) configReload(cf Config) {
+
+	lv.SetAppVersion(cf.AppVersion)
+	lv.SetFileUploadSize(cf.FileUploadSize)
+	lv.SetCharset(cf.Charset)
+	lv.SetHTTPSuffixs(cf.Suffixs)
+	lv.SetStaticFileSuffixs(cf.StaticFileSuffixs)
+	lv.SetSessionMaxlifeTime(cf.SessionMaxlifeTime)
+	lv.SetTemplateSuffix(cf.TemplateSuffix)
+	lv.SetRespWriteCompress(cf.IsRespWriteCompress)
+	lv.userData = cf.UserData
+
+	//	restart
+	lv.SetServerTimeout(cf.ServerTimeout)
+	lv.SetCompactHTML(cf.IsCompactHTML)
+	lv.SetLogConfigPath(cf.LogConfigPath)
+	lv.SetLogGroup(cf.LogGroup)
+
+}
+
+/**
+ *	status page response writer set content-type and header code
+ *	不使用压缩的输出的
+ *
+ *	@param rw
+ *	@param value
+ */
+func (lv *LeafveinServer) statusPageWriter(value HttpStatusValue, rw http.ResponseWriter) error {
+	rw.Header().Set("Content-Encoding", "none")
+	rw.Header().Set("Content-Type", "text/html; charset="+lv.Charset())
+	rw.WriteHeader(int(value.status))
+	return lv.statusPageExecute(value, rw)
+}
+
+/**
+ *	status page template execute
+ *
+ *	@param wr
+ *	@param value
+ */
+func (lv *LeafveinServer) statusPageExecute(value HttpStatusValue, wr io.Writer) error {
+	status := strconv.Itoa(int(value.status))
+
+	//	根据状态代码先查找模版，直接查找模版的根目录
+	tplName := status + lv.TemplateSuffix()
+
+	tmpl, err := lv.template.Parse(tplName)
+
+	if nil != err {
+		tmpl, err = lv.template.ParseString(tplName, HttpStartTemplate)
+		if nil != err {
+			return err
+		}
+	}
+
+	return tmpl.Execute(wr, value.data)
+}
+
+/**
+ *	parse router
+ *	TODO
+ *
+ *	@return success == true
+ */
+func (lv *LeafveinServer) parseRouter(logInfo *string) bool {
+
+	//	log manager
+	SFLog.LoadConfig(lv.logConfigPath)
+	logTag := fmt.Sprintf("Leafvein(%s)", lv.appName)
+	lv.log = SFLog.NewLogger(logTag)
+
+	lv.template.SetCache(!lv.isDevel)
+
+	//	add global touter
+	for _, router := range _globalRouterList {
+		if router.appName == lv.AppName() {
+			lv.AddRouter(router.routerKey, router.router)
+		}
+	}
+
+	//	validate routers nil
+	if 0 == len(lv.routers) {
+		lv.log.Fatal("LeafveinServer %v fatal: routers == nil \n", startName)
+		return false
+	}
+
+	//	validate folder
+	if isExites, isDir, _ := SFFileManager.Exists(lv.operatingDir); !isExites || !isDir {
+		lv.log.Warn("not locate the operating directory, will not be able to manipulate files,\n %v \n operation directory is created under the app name directory \n", lv.operatingDir)
+	}
+
+	if isExites, isDir, _ := SFFileManager.Exists(lv.WebRootDir()); !isExites || !isDir {
+		lv.log.Warn("not locate the %v directory, will not be able to read a static file resource and upload file. \n  need to create directory: %v \n", lv.webRootDir, lv.WebRootDir())
+	}
+
+	//	print log info
+	*logInfo += "controller:\n"
+	for key, value := range lv.routers {
+		*logInfo += fmt.Sprintf("[%#v] %v\n", key, value.Info())
+	}
+
+	return true
+}
+
+/**
+ *	start leafvein server
+ *
+ *	@param startName "DevelStart" or "Start" or "HandlerFunc"
+ */
+func (lv *LeafveinServer) start(startName string) {
+
+	//	start info
+	logInfo := fmt.Sprintf("Leafvein %v...\n", startName)
+
+	if !lv.parseRouter(&logInfo) {
+		return
+	}
+
+	//	打印启动信息
+	addr := lv.addr
+	if 0 < lv.port {
+		addr = fmt.Sprintf("%s:%d", lv.addr, lv.port)
+	}
+	if addr == "" {
+		addr = fmt.Sprintf(":%d", 8080)
+	}
+
+	//	由于addr设置为127.0.0.1的时候就只能允许内网进行http://localhost:(port)/进行访问，本机IP访问不了。
+	//	为了友好的显示，如果addr设置为空的时候允许IP或localhost进行访问做了特别的显示除了（http://0.0.0.0:8080）
+	if strings.Index(addr, ":") == 0 {
+		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://0.0.0.0%v \n", startName, lv.port, addr)
+	} else {
+		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://%v \n", startName, lv.port, addr)
+	}
+	lv.log.Info(logInfo)
+
+	// server and listen
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      lv,
+		ReadTimeout:  time.Duration(lv.serverTimeout) * time.Second,
+		WriteTimeout: time.Duration(lv.serverTimeout) * time.Second,
+	}
+
+	var err error
+	lv.listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		lv.log.Fatal("Leafveingo %v Listen: %v \n", startName, err)
+		return
+	}
+
+	lv.isStart = true
+	err = server.Serve(lv.listener)
+	if err != nil {
+		lv.log.Fatal("Leafveingo %v Serve: %v \n", startName, err)
+		lv.isStart = false
+	}
+}
+
+/**
+ *	defer func ServeHTTP(...)
+ *
+ *	@param context
+ */
+func (lv *LeafveinServer) deferServeHTTP(context *HttpContext) {
+
+	if err := recover(); err != nil {
+		errStr := fmt.Sprintln(err)
+
+		//	print stack
+		stackBuf := bytes.NewBufferString("")
+		for i := 2; ; i++ {
+			pc, file, line, ok := runtime.Caller(i)
+			if !ok {
+				break
+			}
+			fn := runtime.FuncForPC(pc).Name()
+			if 0 != len(file) {
+				//	/usr/local/go/src/pkg/runtime/proc.c:1223 (0x173d0)
+				fmt.Fprintf(stackBuf, "%s(...)\n%s:%d (0x%x)\n", fn, file, line, pc)
+			} else {
+				// 	runtime.goexit(...)
+				// 	L1223: runtime.goexit(...) (0x173d0)
+				fmt.Fprintf(stackBuf, "L%d: %s(...) (0x%x)\n", line, fn, pc)
+			}
+		}
+
+		//	page write
+		if nil != context {
+			if lv.isDevel {
+				context.StatusPageWrite(Status500, Status500Msg, errStr, stackBuf.String())
+			} else {
+				context.StatusPageWrite(Status500, Status500Msg, "", "")
+			}
+		} else {
+			if lv.isDevel {
+				lv.statusPageWriter(NewHttpStatusValue(Status500, Status500Msg, errStr, stackBuf.String()), rw)
+			} else {
+				lv.statusPageWriter(NewHttpStatusValue(Status500, Status500Msg, "", ""), rw)
+			}
+		}
+
+		fmt.Fprintf(stackBuf, "\n-----------------------------\nleafveiongo version:%v \ngolang version: %v", lv.Version(), runtime.Version())
+		lv.log.Error(stackBuf.String())
+	}
+
+	if nil != context {
+		context.free()
+	}
+}
+
+//# mark LeafveinServer public method	--------------------------------------------------------------------------------------------
+
+/**
+ *	start leafvein server
+ */
+func (lv *LeafveinServer) Start() {
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+
+	lv.isDevel = _flagDeveloper
+
+	if _flagDeveloper {
+		lv.start("DevelStart")
+	} else {
+		args := flag.Args()
+		if 0 < len(args) {
+			fmt.Println("incorrect command arguments. \n [-devel] = developer mode, [(nil)] = produce mode.")
+			return
+		}
+		lv.start("Start")
+	}
+}
+
+/**
+ *	获取leafveingo的一个Handler, 方便在其他应用进行扩展leafveingo
+ *	get leafveingo handler, Easily be extended to other applications
+ *
+ *	@prefix	 url prefix
+ */
+func (lv *LeafveinServer) GetHandlerFunc(prefix string) (handler http.Handler, err error) {
+
+	if 2 > len(prefix) || prefix[0] != '/' {
+		err = NewLeafveingoError("GetHandlerFunc(...) prefix error : %#v  reference ( \"/expand\" )", prefix)
+		return
+	}
+
+	logInfo := fmt.Sprintf("GetHandlerFunc() parse router...\n")
+
+	if !lv.parseRouter(&logInfo) {
+		return
+	}
+
+	lv.log.Info(logInfo)
+
+	f := func(w http.ResponseWriter, r *http.Request) {
+		//	匹配前缀
+		if strings.HasPrefix(r.URL.Path, lv.prefix) {
+			lv.ServeHTTP(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	}
+	lv.prefix = prefix
+	handler = http.HandlerFunc(f)
+
+	return
+}
+
+/**
+ *	add router
+ *	leafvein interface implement RESTfulRouter ReflectRouter
+ *
+ *	@param routerKey	"/" || "/user/" || "/admin". first char must be '/'
+ * 	@param router
+ */
+func (lv *LeafveinServer) AddRouter(routerKey string, router IRouter) {
+
+	//	验证添加路由path的规则
+	//	字符串不等于nil || 查询不到"/" || "/" 不在首位
+	if len(routerKey) == 0 || routerKey[0] != '/' {
+		panic(NewLeafveingoError("%T AddRouter routerKey error : %v  reference ( \"/\" | \"/Admin/\" )", controller, routerKey))
+	}
+
+	if nil == router {
+		return
+	}
+
+	key := strings.ToLower(routerKey)
+	if v, ok := lv.routers[key]; ok {
+		lv.log.Warn("[%#v]router key already exists(IRouter:%v), (IRouter:%v)can not add.", key, v, router)
+		return
+	}
+
+	lv.routers[key] = router
+	lv.routerKeys = append(lv.routerKeys, key)
+	sort.Sort(sort.Reverse(SFStringsUtil.SortLengToShort(lv.routerKeys)))
+	//	TODO 排序需要测试
+}
+
+/**
+ *	developer mode
+ *
+ *	@return true is developer mode
+ */
+func (lv *LeafveinServer) IsDevel() bool {
+	return lv.isDevel
+}
+
+/**
+ *	is starting
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) IsStart() bool {
+	return lv.isStart
+}
+
+/**
+ *	web application map
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) Application() SFHelper.Map {
+	return lv.application
+}
+
+/**
+ *	custom set session manager
+ *
+ *	@param sessionManager nil == stop use session
+ */
+func (lv *LeafveinServer) SetHttpSessionManager(sessionManager *LVSession.HttpSessionManager) {
+
+	if nil != lv.sessionManager {
+		lv.sessionManager.Free()
+		lv.sessionManager = nil
+	}
+
+	if nil != sessionManager {
+		lv.sessionManager = sessionManager
+	}
+}
+
+/**
+ *	http session manager
+ */
+func (lv *LeafveinServer) HttpSessionManager() *LVSession.HttpSessionManager {
+	return lv.sessionManager
+}
+
+/**
+ *	user custom config other info
+ *
+ *	@param key
+ *	@return
+ */
+func (lv *LeafveinServer) UserData(key string) string {
+	return lv.userData[key]
+}
+
+/**
+ *	current leafveingo the file operation directory
+ *	OperatingDir() path is created based on AppName
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) OperatingDir() string {
+	return lv.operatingDir
+}
+
+/**
+ *	template directory, primary storage template file
+ *	OperatingDir() created under the directory
+ *
+ *	../sample(AppName)/template
+ */
+func (lv *LeafveinServer) TemplateDir() string {
+	return filepath.Join(lv.operatingDir, DEFAULT_TEMPLATE_DIR_NAME)
+}
+
+/**
+ *	web directory, can read and write to the directory
+ *	primary storage html, css, js, image, zip the file
+ *	OperatingDir() created under the directory
+ *
+ *	../sample(AppName)/webRoot
+ */
+func (lv *LeafveinServer) WebRootDir() string {
+	return filepath.Join(lv.operatingDir, DEFAULT_WEBROOT_DIR_NAME)
+}
+
+/**
+ *	close leafveingo
+ */
+func (lv *LeafveinServer) Close() {
+	if nil != lv.listener {
+		err := lv.listener.Close()
+		if nil != err {
+			lv.log.Fatal("%v", err)
+		}
+		lv.log.Info("Leafveingo http://%v:%v closed", lv.addr, lv.port)
+		lv.isStart = false
+	} else {
+		lv.log.Fatal("current http listener nil, can not be closed")
+	}
+}
+
+//# mark LeafveinServer get set method -------------------------------------------------------------------------------------------
+
+/**
+ *	get application name
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) AppName() string {
+	return lv.appName
+}
+
+/**
+ *	get addr
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) Addr() string {
+	return lv.addr
+}
+
+/**
+ *	get port
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) Port() int {
+	return lv.port
+}
+
+/**
+ *	set server time out
+ *
+ *	Note: need to restart Leafvein Server
+ *
+ *	@param seconds default 0. seconds = 10 = 10s
+ */
+func (lv *LeafveinServer) SetServerTimeout(seconds int64) {
+	lv.serverTimeout = seconds
+}
+
+/**
+ *	get server time out
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) ServerTimeout() int64 {
+	return lv.serverTimeout
+}
+
+/**
+ *	set application version
+ *
+ *	@param version
+ */
+func (lv *LeafveinServer) SetAppVersion(version string) {
+	lv.appVersion = version
+}
+
+/**
+ *	get application version
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) AppVersion() string {
+	return lv.appVersion
+}
+
+/**
+ *	set http session maxlife time, unit second
+ *
+ *	@param second default 1800 second(30 minute), must be greater than 60 seconds
+ */
+func (lv *LeafveinServer) SetSessionMaxlifeTime(second int32) {
+
+	if 60 > second {
+		second = 60
+	}
+	lv.sessionMaxlifeTime = second
+}
+
+/**
+ *	get http session maxlife time, unit second
+ */
+func (lv *LeafveinServer) SessionMaxlifeTime() int32 {
+	return lv.sessionMaxlifeTime
+}
+
+/**
+ *	set leafveingo http request supported suffixes. e.g.: (.go),(.htm) ...
+ *	default nil, what form can access, the first is the default suffix
+ *
+ *	@param suffixs ".go",".htm"...
+ */
+func (lv *LeafveinServer) SetHTTPSuffixs(suffixs ...string) {
+	for i, v := range suffixs {
+		if 0 != len(v) && v[0] != '.' {
+			suffixs[i] = "." + v
+		}
+	}
+	lv.suffixs = suffixs
+}
+
+/**
+ *	get http request supported suffixes
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) HTTPSuffixs() []string {
+	return lv.suffixs
+}
+
+/**
+ *	set static resource file suffixs
+ *
+ *	@param suffixs default ".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"
+ */
+func (lv *LeafveinServer) SetStaticFileSuffixs(suffixs ...string) {
+	for i, v := range suffixs {
+		if 0 != len(v) && v[0] != '.' {
+			suffixs[i] = "." + v
+		}
+	}
+	lv.staticFileSuffixs = suffixs
+}
+
+/**
+ *	get static resource file suffixs
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) StaticFileSuffixs() []string {
+	return lv.staticFileSuffixs
+}
+
+/**
+ *	set template suffix,
+ *
+ *	@param suffix default ".tpl"
+ */
+func (lv *LeafveinServer) SetTemplateSuffix(suffix string) {
+	if 0 != len(suffix) && suffix[0] != '.' {
+		suffix = "." + suffix
+	}
+	lv.templateSuffix = suffix
+}
+
+/**
+ *	get template suffix
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) TemplateSuffix() string {
+	return lv.templateSuffix
+}
+
+/**
+ *	set file size upload
+ *
+ *	@param maxSize default 32M
+ */
+func (lv *LeafveinServer) SetFileUploadSize(maxSize int64) {
+	if 0 < maxSize {
+		lv.fileUploadSize = maxSize
+	}
+}
+
+/**
+ *	get file size upload
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) FileUploadSize() int64 {
+	return lv.fileUploadSize
+}
+
+/**
+ *	set html encoding type
+ *
+ *	@param encode default utf-8
+ */
+func (lv *LeafveinServer) SetCharset(encode string) {
+	lv.charset = encode
+}
+
+/**
+ *	get html encoding type
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) Charset() string {
+	return lv.charset
+}
+
+/**
+ *	is ResponseWriter writer compress gizp...
+ *	According Accept-Encoding select compress type
+ *
+ *  Note: need to restart Leafvein Server
+ *
+ *	@param b default true
+ */
+func (lv *LeafveinServer) SetRespWriteCompress(b bool) {
+	lv.isRespWriteCompress = b
+}
+
+/**
+ *	RespWriteCompress
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) IsRespWriteCompress() bool {
+	return lv.isRespWriteCompress
+}
+
+/**
+ *	out html is compact remove (\t \n space) sign
+ *	only template file out use
+ *
+ *  Note: need to restart Leafvein Server
+ *
+ *	@param compact default true
+ */
+func (lv *LeafveinServer) SetCompactHTML(compact bool) {
+	lv.template.SetCompactHTML(compact)
+}
+
+/**
+ *	get is compact HTML
+ */
+func (lv *LeafveinServer) IsCompactHTML() bool {
+	return lv.template.IsCompactHTML()
+}
+
+/**
+ *	set log config path
+ *
+ *  Note: need to restart Leafvein Server
+ *
+ *	@param path
+ */
+func (lv *LeafveinServer) SetLogConfigPath(path string) {
+	lv.logConfPath = path
+}
+
+/**
+ *	get log config path
+ */
+func (lv *LeafveinServer) LogConfPath() string {
+	return lv.logConfPath
+}
+
+/**
+ *	set log group name
+ *
+ *	Note: need to restart application
+ *
+ *	@param groupName
+ */
+func (lv *LeafveinServer) SetLogGroup(groupName string) {
+	lv.logGroup = groupName
+}
+
+/**
+ *	get log group name
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) LogGroup() string {
+	return lv.logGroup
+}
+
+//# mark LeafveinHttp override method -------------------------------------------------------------------------------------------
+
+/**
+ *	ServeHTTP
+ */
+func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//	TODO 考虑是否加上读取锁，等测试性能后加上再测试看看。
 
 	var context *HttpContext = nil
 
-	defer func() {
-		if err := recover(); err != nil {
-			errStr := fmt.Sprintln(err)
-
-			stackBuf := bytes.NewBufferString("")
-
-			for i := 2; ; i++ {
-				pc, file, line, ok := runtime.Caller(i)
-				if !ok {
-					break
-				}
-				fn := runtime.FuncForPC(pc).Name()
-				if 0 != len(file) {
-					//	/usr/local/go/src/pkg/runtime/proc.c:1223 (0x173d0)
-					fmt.Fprintf(stackBuf, "%s(...)\n%s:%d (0x%x)\n", fn, file, line, pc)
-				} else {
-					// 	runtime.goexit(...)
-					// 	L1223: runtime.goexit(...) (0x173d0)
-					fmt.Fprintf(stackBuf, "L%d: %s(...) (0x%x)\n", line, fn, pc)
-				}
-			}
-
-			if nil != context {
-				if lv.isDevel {
-					context.StatusPageWrite(Status500, Status500Msg, errStr, stackBuf.String())
-				} else {
-					context.StatusPageWrite(Status500, Status500Msg, "", "")
-				}
-			} else {
-				if lv.isDevel {
-					lv.statusPageWriter(rw, NewHttpStatusValue(Status500, Status500Msg, errStr, stackBuf.String()))
-				} else {
-					lv.statusPageWriter(rw, NewHttpStatusValue(Status500, Status500Msg, "", ""))
-				}
-			}
-
-			fmt.Fprintf(stackBuf, "\n-----------------------------\nleafveiongo version:%v \ngolang version: %v", lv.Version(), runtime.Version())
-			lvLog.Error(stackBuf.String())
-		}
-
-		if nil != context {
-			context.closeWriter()
-		}
-	}()
+	defer lv.deferServeHTTP(context)
 
 	reqPath := req.URL.Path
 
@@ -421,6 +1054,10 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		reqPath = "/"
 	}
 
+	//	TODO
+	//	截取后缀
+	reqSuffixs := ""
+
 	//	静态文件解析
 	if reqPath[len(reqPath)-1] != '/' && 0 != len(lv.staticFileSuffixs) {
 		for _, staticSuffixs := range lv.staticFileSuffixs {
@@ -437,14 +1074,14 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				} else {
 					// 404
 					// http.NotFound(rw, req)
-					lv.statusPageWriter(rw, NewHttpStatusValue(Status404, Status404Msg, "", ""))
+					lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "", ""), rw)
 				}
 				return
 			}
 		}
 	}
 
-	context = newContext(rw, req, lv.isRespWriteCompress)
+	context = newContext(lv, rw, req, lv.isRespWriteCompress)
 
 	routerKey, methodName, urlSuffix, ctrlPath, statusCode := lv.routerParse(reqPath, context)
 
@@ -453,7 +1090,7 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		errstr := ""
 		statusCode, e = lv.cellController(routerKey, methodName, urlSuffix, ctrlPath, context)
 		if nil != e {
-			lvLog.Error(e.Error())
+			lv.log.Error(e.Error())
 			if lv.isDevel {
 				errstr = e.Error()
 			}
@@ -478,340 +1115,4 @@ func (lv *sfLeafvein) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		context.StatusPageWrite(statusCode, StatusMsg(statusCode), "", "")
 	}
 
-}
-
-func (lv *sfLeafvein) start(startName string) {
-	SFLog.StartLogManager(lv.logChannelSize)
-	SFLog.LoadConfig(lv.logConfPath)
-
-	logInfo := fmt.Sprintf("SFLeafvein %v...\n", startName)
-
-	if 0 == len(lv.controllers) {
-		lvLog.Fatal("Leafveingo %v fatal: Controller == nil \n", startName)
-		return
-	}
-
-	//	目录检测
-	if isExites, isDir, _ := SFFileManager.Exists(lv.operatingDir); !isExites || !isDir {
-		lvLog.Warn("not locate the operating directory, will not be able to manipulate files,\n %v \n operation directory is created under the app name directory \n", lv.operatingDir)
-	}
-
-	if isExites, isDir, _ := SFFileManager.Exists(lv.WebRootDir()); !isExites || !isDir {
-		lvLog.Warn("not locate the %v directory, will not be able to read a static file resource and upload file. \n  need to create directory: %v \n", lv.webRootDir, lv.WebRootDir())
-	}
-
-	logInfo += "controller:\n"
-	//	打印add的控制器
-	for key, value := range lv.controllers {
-		isArc := ""
-		if _, ok := lv.controllerArcImpls[key]; ok {
-			isArc = "(Implemented AdeRouterController)"
-		}
-		logInfo += fmt.Sprintf("%v  \t router : %#v  %v\n", value.Type(), key, isArc)
-	}
-
-	//	打印启动信息
-	addr := lv.addr
-	if 0 < lv.port {
-		addr = fmt.Sprintf("%s:%d", lv.addr, lv.port)
-	}
-	if addr == "" {
-		addr = fmt.Sprintf(":%d", 8080)
-	}
-
-	//	由于addr设置为127.0.0.1的时候就只能允许内网进行http://localhost:(port)/进行访问，本机IP访问不了。
-	//	为了友好的显示，如果addr设置为空的时候允许IP或localhost进行访问做了特别的显示除了（http://0.0.0.0:8080）
-	if strings.Index(addr, ":") == 0 {
-		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://0.0.0.0%v \n", startName, lv.port, addr)
-	} else {
-		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://%v \n", startName, lv.port, addr)
-	}
-	lvLog.Info(logInfo)
-
-	if lv.isUseSession {
-		//	自动开启Session GC操作
-		lv.sessionManager = LVSession.SharedSessionManager(lv.isGCSession)
-	}
-
-	//	设置 server and listen
-	server := &http.Server{
-		Addr:         addr,
-		Handler:      lv,
-		ReadTimeout:  time.Duration(lv.serverTimeout) * time.Second,
-		WriteTimeout: time.Duration(lv.serverTimeout) * time.Second,
-	}
-
-	var err error
-	lv.listener, err = net.Listen("tcp", addr)
-	if err != nil {
-		lvLog.Fatal("Leafveingo %v Listen: %v \n", startName, err)
-		return
-	}
-
-	lv.isStart = true
-	err = server.Serve(lv.listener)
-	if err != nil {
-		lvLog.Fatal("Leafveingo %v Serve: %v \n", startName, err)
-		lv.isStart = false
-	}
-
-}
-
-func (lv *sfLeafvein) Start() {
-
-	if !flag.Parsed() {
-		flag.Parse()
-	}
-
-	lv.isDevel = _flagDeveloper
-	lv.template.SetCache(!_flagDeveloper)
-
-	if _flagDeveloper {
-		lv.start("DevelStart")
-	} else {
-		args := flag.Args()
-		if 0 < len(args) {
-			fmt.Println("incorrect command arguments. \n [-devel] = developer mode, [(nil)] = produce mode.")
-			return
-		}
-		lv.start("Start")
-	}
-
-}
-
-func (lv *sfLeafvein) AddController(routerKey string, controller interface{}) {
-
-	//	验证添加路由path的规则
-	//	字符串不等于nil || 查询不到"/" || "/" 不在首位
-	if len(routerKey) == 0 || routerKey[0] != '/' {
-		panic(NewLeafveingoError("%T AddController routerKey path error : %v  reference ( \"/\" | \"/Admin/\" )", controller, routerKey))
-	}
-
-	if nil == controller {
-		return
-	}
-
-	refValue := reflect.ValueOf(controller)
-	key := strings.ToLower(routerKey)
-	lv.controllers[key] = refValue
-	lv.controllerKeys = append(lv.controllerKeys, key)
-	sort.Sort(sort.Reverse(SFStringsUtil.SortLengToShort(lv.controllerKeys)))
-	//	TODO 排序需要测试
-
-	if refValue.Type().Implements(_arcType) {
-		lv.controllerArcImpls[key] = controller.(AdeRouterController)
-	}
-
-}
-
-func (lv *sfLeafvein) GetHandlerFunc(prefix string) (handler http.Handler, err error) {
-	if 0 == len(lv.controllers) {
-		err = errors.New("Leafveingo Start fatal: Controller == nil")
-		return
-	}
-
-	f := func(w http.ResponseWriter, r *http.Request) {
-		//	匹配前缀
-		if strings.HasPrefix(r.URL.Path, lv.prefix) {
-			lv.ServeHTTP(w, r)
-		} else {
-			http.NotFound(w, r)
-		}
-	}
-	lv.prefix = prefix
-	handler = http.HandlerFunc(f)
-	return
-}
-func (lv *sfLeafvein) Close() {
-	if nil != lv.listener {
-		err := lv.listener.Close()
-		if nil != err {
-			lvLog.Fatal("%v", err)
-		}
-		lvLog.Info("Leafveingo http://%v:%v closed", lv.addr, lv.port)
-		lv.isStart = false
-	} else {
-		lvLog.Fatal("current http listener nil, can not be closed")
-	}
-}
-
-func (lv *sfLeafvein) IsDevel() bool {
-	return lv.isDevel
-}
-func (lv *sfLeafvein) IsStart() bool {
-	return lv.isStart
-}
-func (lv *sfLeafvein) Application() SFHelper.Map {
-	return lv.application
-}
-func (lv *sfLeafvein) HttpSessionManager() *LVSession.HttpSessionManager {
-	return lv.sessionManager
-}
-func (lv *sfLeafvein) SetUseSession(b bool) {
-	lv.isUseSession = b
-}
-func (lv *sfLeafvein) SetGCSession(b bool) {
-	lv.isGCSession = b
-}
-func (lv *sfLeafvein) SetSessionMaxlifeTime(second int32) {
-	if 60 <= second {
-		lv.sessionMaxlifeTime = second
-	}
-}
-func (lv *sfLeafvein) SessionMaxlifeTime() int32 {
-	return lv.sessionMaxlifeTime
-}
-
-func (lv *sfLeafvein) SetHTTPSuffixs(suffixs ...string) {
-	for i, v := range suffixs {
-		if 0 != len(v) && v[0] != '.' {
-			suffixs[i] = "." + v
-		}
-	}
-	lv.suffixs = suffixs
-}
-func (lv *sfLeafvein) HTTPSuffixs() []string {
-	return lv.suffixs
-}
-
-func (lv *sfLeafvein) SetStaticFileSuffixs(suffixs ...string) {
-	for i, v := range suffixs {
-		if 0 != len(v) && v[0] != '.' {
-			suffixs[i] = "." + v
-		}
-	}
-	lv.staticFileSuffixs = suffixs
-}
-func (lv *sfLeafvein) StaticFileSuffixs() []string {
-	return lv.staticFileSuffixs
-}
-
-func (lv *sfLeafvein) SetTemplateSuffix(suffix string) {
-	if 0 != len(suffix) && suffix[0] != '.' {
-		suffix = "." + suffix
-	}
-	lv.templateSuffix = suffix
-}
-func (lv *sfLeafvein) TemplateSuffix() string {
-	return lv.templateSuffix
-}
-
-func (lv *sfLeafvein) Version() string {
-	return VERSION
-}
-
-func (lv *sfLeafvein) SetAddr(addr string) {
-	lv.addr = addr
-}
-func (lv *sfLeafvein) Addr() string {
-	return lv.addr
-}
-
-func (lv *sfLeafvein) SetPort(port int) {
-	if 0 < port {
-		lv.port = port
-	}
-}
-func (lv *sfLeafvein) Port() int {
-	return lv.port
-}
-
-func (lv *sfLeafvein) SetFileUploadSize(maxSize int64) {
-	if 0 < maxSize {
-		lv.fileUploadSize = maxSize
-	}
-}
-func (lv *sfLeafvein) FileUploadSize() int64 {
-	return lv.fileUploadSize
-}
-
-func (lv *sfLeafvein) SetCharset(encode string) {
-	lv.charset = encode
-}
-func (lv *sfLeafvein) Charset() string {
-	return lv.charset
-}
-
-func (lv *sfLeafvein) SetRespWriteCompress(b bool) {
-	lv.isRespWriteCompress = b
-}
-func (lv *sfLeafvein) IsRespWriteCompress() bool {
-	return lv.isRespWriteCompress
-}
-
-func (lv *sfLeafvein) SetCompactHTML(compact bool) {
-	lv.template.SetCompactHTML(compact)
-}
-func (lv *sfLeafvein) IsCompactHTML() bool {
-	return lv.template.IsCompactHTML()
-}
-
-func (lv *sfLeafvein) SetServerTimeout(seconds int64) {
-	lv.serverTimeout = seconds
-}
-func (lv *sfLeafvein) ServerTimeout() int64 {
-	return lv.serverTimeout
-}
-
-func (lv *sfLeafvein) SetAppName(name string) {
-	if !_rexW.MatchString(name) {
-		panic(NewLeafveingoError("set AppName format(a-zA-Z0-9) error:%v", name))
-	}
-
-	lv.appName = name
-	lv.operatingDir = filepath.Join(SFFileManager.GetExecDir(), lv.appName)
-	//	由于主操作目录改变，模板目录也需要重新设置主目录
-	lv.template.SetBaseDir(lv.TemplateDir())
-}
-func (lv *sfLeafvein) AppName() string {
-	return lv.appName
-}
-
-func (lv *sfLeafvein) OperatingDir() string {
-	return lv.operatingDir
-}
-func (lv *sfLeafvein) SetWebRootDir(name string) {
-	if !_rexW.MatchString(name) {
-		panic(NewLeafveingoError("set WebRootDir format(a-zA-Z0-9) error:%v", name))
-	}
-
-	lv.webRootDir = name
-}
-func (lv *sfLeafvein) WebRootDir() string {
-	return filepath.Join(lv.operatingDir, lv.webRootDir)
-}
-
-func (lv *sfLeafvein) SerTemplateDir(name string) {
-	if !_rexW.MatchString(name) {
-		panic(NewLeafveingoError("set TemplateDir format(a-zA-Z0-9) error:%v", name))
-	}
-
-	lv.templateDir = name
-}
-func (lv *sfLeafvein) TemplateDir() string {
-	return filepath.Join(lv.operatingDir, lv.templateDir)
-}
-
-func (lv *sfLeafvein) SetAppVersion(version string) {
-	lv.appVersion = version
-}
-func (lv *sfLeafvein) AppVersion() string {
-	return lv.appVersion
-}
-func (lv *sfLeafvein) Config() *Config {
-	return lv.config
-}
-func (lv *sfLeafvein) LogConfPath() string {
-	return lv.logConfPath
-}
-func (lv *sfLeafvein) SetLogConfPath(path string) {
-	lv.logConfPath = path
-}
-func (lv *sfLeafvein) LogChannelSize() int {
-	return lv.logChannelSize
-}
-func (lv *sfLeafvein) SetLogChannelSize(size int) {
-	if 0 < size {
-		lv.logChannelSize = size
-	}
 }
