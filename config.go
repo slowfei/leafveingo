@@ -72,7 +72,7 @@ var (
 		"IsCompactHTML"			:true,
 
 		"LogConfigPath"		:"config/log.conf",
-		"LogChannelSize"	:5000,
+		"LogGroup" 			:"leafveingo",
 
 		"IsRespWriteCompress"	:true,
 		
@@ -96,8 +96,8 @@ type Config struct {
 	TemplateSuffix string // template suffix
 	IsCompactHTML  bool   // is Compact HTML, 默认true
 
-	LogConfigPath  string // log config path
-	LogChannelSize int    // log channel size default 5000
+	LogConfigPath string // log config path
+	LogGroup      string // log group name
 
 	// is ResponseWriter writer compress gizp...
 	// According Accept-Encoding select compress type
