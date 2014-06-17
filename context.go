@@ -37,18 +37,24 @@ const (
 
 //	request context
 type HttpContext struct {
-	RespWrite       http.ResponseWriter
-	Request         *http.Request
+	//	TODO 预留改版的扩展
+	super *HttpContext
+
+	lvServer        *LeafveinServer
 	reqBody         []byte
 	session         LVSession.HttpSession
 	routerKeys      []string  // router keys
 	methodNames     []string  // request controller method names
 	contentEncoding string    // 压缩类型存储
 	comperssWriter  io.Writer //
+	isCloseWriter   bool      // is cell closeWriter()
+
+	RespWrite http.ResponseWriter
+	Request   *http.Request
 }
 
 //	new context
-func newContext(rw http.ResponseWriter, req *http.Request, respWirteCompress bool) *HttpContext {
+func newContext(server *LeafveinServer, rw http.ResponseWriter, req *http.Request, respWirteCompress bool) *HttpContext {
 	var outWrite io.Writer
 	var err error
 	acceptEncoding := strings.ToLower(req.Header.Get("Accept-Encoding"))
@@ -69,11 +75,15 @@ func newContext(rw http.ResponseWriter, req *http.Request, respWirteCompress boo
 		outWrite = rw
 	}
 
-	return &HttpContext{RespWrite: rw, Request: req, reqBody: nil, session: nil, contentEncoding: encoding, comperssWriter: outWrite}
+	return &HttpContext{lvServer: server, RespWrite: rw, Request: req, reqBody: nil, session: nil, contentEncoding: encoding, comperssWriter: outWrite, isCloseWriter: false}
 }
 
-// colse comperss writer
+/**
+ *	colse comperss writer
+ */
 func (ctx *HttpContext) closeWriter() {
+	ctx.isCloseWriter = true
+
 	switch ow := ctx.comperssWriter.(type) {
 	case *gzip.Writer:
 		ow.Close()
@@ -81,23 +91,38 @@ func (ctx *HttpContext) closeWriter() {
 		ow.Close()
 	case http.ResponseWriter:
 	default:
-		lvLog.Debug("出现未知的压缩数据类型：(%T) 可能没有进行释放.", ow)
+		ctx.server.log.Debug("出现未知的压缩数据类型：(%T) 可能没有进行释放.", ow)
 	}
+}
+
+/**
+ *	end request free context
+ *
+ */
+func (ctx *HttpContext) free() {
+	if !ctx.isCloseWriter {
+		ctx.closeWriter()
+	}
+	ctx.lvServer = nil
+	ctx.session = nil
+	ctx.reqBody = nil
+	ctx.comperssWriter = nil
+	ctx.RespWrite = nil
+	ctx.Request = nil
 }
 
 //	get session, context the only session
 //	@resetToken is reset session token
 func (ctx *HttpContext) Session(resetToken bool) (LVSession.HttpSession, error) {
-	if nil == _thisLeafvein {
-		return nil, ErrLeafveingoNotInit
-	}
-	if nil == _thisLeafvein.HttpSessionManager() {
+
+	sessionManager := ctx.lvServer.HttpSessionManager()
+	if nil == sessionManager {
 		return nil, ErrHttpSessionManagerClosed
 	}
 
 	if nil == ctx.session {
 		var sessError error
-		ctx.session, sessError = _thisLeafvein.HttpSessionManager().GetSession(ctx.RespWrite, ctx.Request, _thisLeafvein.SessionMaxlifeTime(), resetToken)
+		ctx.session, sessError = sessionManager.GetSession(ctx.RespWrite, ctx.Request, ctx.lvServer.SessionMaxlifeTime(), resetToken)
 		if nil != sessError {
 			lvLog.Error("get session error:%v", sessError)
 			return nil, sessError
@@ -265,13 +290,13 @@ func (ctx *HttpContext) StatusPageWrite(status HttpStatus, msg, error, stack str
 //	status page write
 //	可以自定义指定模版的参数
 func (ctx *HttpContext) StatusPageWriteByValue(value HttpStatusValue) error {
-	if nil == _thisLeafvein {
-		return ErrLeafveingoNotInit
-	}
+	server := ctx.lvServer
+
 	ioWr := ctx.ComperssWriter()
-	ctx.RespWrite.Header().Set("Content-Type", "text/html; charset="+_thisLeafvein.Charset())
+	ctx.RespWrite.Header().Set("Content-Type", "text/html; charset="+server.Charset())
 	ctx.RespWrite.WriteHeader(int(value.status))
-	err := _thisLeafvein.statusPageExecute(ioWr, value)
+
+	err := server.statusPageExecute(value, ioWr)
 
 	if nil != err {
 		lvLog.Error(err.Error())

@@ -119,36 +119,3 @@ func StatusMsg(status HttpStatus) string {
 	}
 	return msg
 }
-
-//	status page response writer set content-type and header code
-//	不使用压缩的输出的
-//	@rw
-//	@value
-func (lv *sfLeafvein) statusPageWriter(rw http.ResponseWriter, value HttpStatusValue) error {
-	rw.Header().Set("Content-Encoding", "none")
-	rw.Header().Set("Content-Type", "text/html; charset="+lv.charset)
-	rw.WriteHeader(int(value.status))
-	return lv.statusPageExecute(rw, value)
-}
-
-//	status page template execute
-//	@wr
-//	@value
-func (lv *sfLeafvein) statusPageExecute(wr io.Writer, value HttpStatusValue) error {
-	status := strconv.Itoa(int(value.status))
-
-	//	根据状态代码先查找模版，直接查找模版的根目录
-	tplName := status + lv.templateSuffix
-
-	tmpl, err := lv.template.Parse(tplName)
-
-	if nil != err {
-		tmpl, err = lv.template.ParseString(tplName, HttpStartTemplate)
-
-		if nil != err {
-			return err
-		}
-	}
-
-	return tmpl.Execute(wr, value.data)
-}
