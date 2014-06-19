@@ -63,8 +63,7 @@ var (
 		"AppVersion"		:"1.0",
 		"FileUploadSize"	:33554432,
 		"Charset"		:"utf-8",
-		"Suffixs"		:[""],
-		"StaticFileSuffixs"	:[".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"],
+		"StaticFileSuffixes"	:[".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"],
 		"ServerTimeout"		:0,
 		"SessionMaxlifeTime"	:1800,
 
@@ -88,8 +87,7 @@ type Config struct {
 	AppVersion         string   // app version.
 	FileUploadSize     int64    // file size upload
 	Charset            string   // html encode type
-	Suffixs            []string // http url suffixs
-	StaticFileSuffixs  []string // supported static file suffixs
+	StaticFileSuffixes []string // supported static file suffixes
 	ServerTimeout      int64    // server time out, default 0
 	SessionMaxlifeTime int32    // http session maxlife time, unit second. use session set
 
