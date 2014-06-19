@@ -218,13 +218,12 @@ type LeafveinServer struct {
 
 	/* #mark optional params, see detailed defaults value to config.go _defaultConfigJson ******************/
 
-	appVersion         string   // app version
-	fileUploadSize     int64    // file size upload
-	charset            string   // html encode type
-	suffixs            []string // http url suffixs
-	staticFileSuffixs  []string // supported static file suffixs
-	serverTimeout      int64    // server time out, default 0
-	sessionMaxlifeTime int32    // http session maxlife time, unit second. use session set
+	appVersion         string            // app version
+	fileUploadSize     int64             // file size upload
+	charset            string            // html encode type
+	staticFileSuffixes map[string]string // supported static file suffixes
+	serverTimeout      int64             // server time out, default 0
+	sessionMaxlifeTime int32             // http session maxlife time, unit second. use session set
 
 	templateSuffix string // template suffix
 	isCompactHTML  bool   // is Compact HTML, 默认true
@@ -256,10 +255,12 @@ type LeafveinServer struct {
 	//	operatingDir 是根据 appName 建立的目录路径
 	operatingDir string
 
-	prefix   string       // http url prefix
-	listener net.Listener // current http listener
-	isDevel  bool         // developer mode
-	isStart  bool         // is start
+	memWebRootDir  string       // memory storage
+	memTemplateDir string       // memory storage
+	prefix         string       // http url prefix
+	listener       net.Listener // current http listener
+	isDevel        bool         // developer mode
+	isStart        bool         // is start
 
 }
 
@@ -308,13 +309,10 @@ func (lv *LeafveinServer) initPrivate(option ServerOption) {
 	lv.isStart = false
 
 	lv.routers = make(map[string]IRouter)
-
 	lv.application = SFHelper.NewMap()
-
 	lv.operatingDir = filepath.Join(SFFileManager.GetExecDir(), lv.appName)
 
 	lv.template = LVTemplate.NewTemplate()
-	lv.template.SetBaseDir(lv.TemplateDir())
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, Version)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_NAME, lv.AppName)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_VERSION, lv.AppVersion)
@@ -328,6 +326,13 @@ func (lv *LeafveinServer) initPrivate(option ServerOption) {
 }
 
 //# mark LeafveinServer private method -------------------------------------------------------------------------------------------
+
+/**
+ *	closed free resources
+ */
+func (lv *LeafveinServer) free() {
+	//	TODO Temporarily invalid, keep extension
+}
 
 /**
  *	load default config info
@@ -351,8 +356,7 @@ func (lv *LeafveinServer) configReload(cf Config) {
 	lv.SetAppVersion(cf.AppVersion)
 	lv.SetFileUploadSize(cf.FileUploadSize)
 	lv.SetCharset(cf.Charset)
-	lv.SetHTTPSuffixs(cf.Suffixs)
-	lv.SetStaticFileSuffixs(cf.StaticFileSuffixs)
+	lv.SetStaticFileSuffixes(cf.StaticFileSuffixes)
 	lv.SetSessionMaxlifeTime(cf.SessionMaxlifeTime)
 	lv.SetTemplateSuffix(cf.TemplateSuffix)
 	lv.SetRespWriteCompress(cf.IsRespWriteCompress)
@@ -412,11 +416,17 @@ func (lv *LeafveinServer) statusPageExecute(value HttpStatusValue, wr io.Writer)
  */
 func (lv *LeafveinServer) parseRouter(logInfo *string) bool {
 
+	//	memory storage
+	lv.memTemplateDir = filepath.Join(lv.operatingDir, DEFAULT_TEMPLATE_DIR_NAME)
+	lv.memWebRootDir = filepath.Join(lv.operatingDir, DEFAULT_WEBROOT_DIR_NAME)
+
 	//	log manager
 	SFLog.LoadConfig(lv.logConfigPath)
 	logTag := fmt.Sprintf("Leafvein(%s)", lv.appName)
 	lv.log = SFLog.NewLogger(logTag)
 
+	//	template
+	lv.template.SetBaseDir(lv.TemplateDir())
 	lv.template.SetCache(!lv.isDevel)
 
 	//	add global touter
@@ -620,10 +630,34 @@ func (lv *LeafveinServer) GetHandlerFunc(prefix string) (handler http.Handler, e
  *	add router
  *	leafvein interface implement RESTfulRouter ReflectRouter
  *
+ *	match rules:
+ *		(keys sort of long to short)
+ *		keys =[
+ *				"/admin/user/"
+ *				"/admin/"
+ *				"/user/"
+ *				"/"
+ *			  ]
+ *
+ *		e.g.:
+ *
+ *		[urlPath] = [key]; $host = "http://localhost:8080"
+ *		$host/admin/user/manager = "/admin/user/"
+ *		$host/admin/index		 = "/admin/"
+ *		$host/user/index		 = "/user/"
+ *		$host/admin              = "/"
+ *		$host/index              = "/"
+ *
+ *
  *	@param routerKey	"/" || "/user/" || "/admin". first char must be '/'
  * 	@param router
  */
 func (lv *LeafveinServer) AddRouter(routerKey string, router IRouter) {
+
+	if lv.isStart {
+		lv.log.Warn("AddRouter(...) Leafvein server has been started can not be set.")
+		return
+	}
 
 	//	验证添加路由path的规则
 	//	字符串不等于nil || 查询不到"/" || "/" 不在首位
@@ -643,8 +677,9 @@ func (lv *LeafveinServer) AddRouter(routerKey string, router IRouter) {
 
 	lv.routers[key] = router
 	lv.routerKeys = append(lv.routerKeys, key)
+
+	//	由长到短进行排序
 	sort.Sort(sort.Reverse(SFStringsUtil.SortLengToShort(lv.routerKeys)))
-	//	TODO 排序需要测试
 }
 
 /**
@@ -680,6 +715,11 @@ func (lv *LeafveinServer) Application() SFHelper.Map {
  *	@param sessionManager nil == stop use session
  */
 func (lv *LeafveinServer) SetHttpSessionManager(sessionManager *LVSession.HttpSessionManager) {
+
+	if lv.isStart {
+		lv.log.Warn("SetHttpSessionManager(...) Leafvein server has been started can not be set.")
+		return
+	}
 
 	if nil != lv.sessionManager {
 		lv.sessionManager.Free()
@@ -725,7 +765,7 @@ func (lv *LeafveinServer) OperatingDir() string {
  *	../sample(AppName)/template
  */
 func (lv *LeafveinServer) TemplateDir() string {
-	return filepath.Join(lv.operatingDir, DEFAULT_TEMPLATE_DIR_NAME)
+	return lv.memTemplateDir
 }
 
 /**
@@ -736,11 +776,13 @@ func (lv *LeafveinServer) TemplateDir() string {
  *	../sample(AppName)/webRoot
  */
 func (lv *LeafveinServer) WebRootDir() string {
-	return filepath.Join(lv.operatingDir, DEFAULT_WEBROOT_DIR_NAME)
+	return lv.memWebRootDir
 }
 
 /**
- *	close leafveingo
+ *	close Leafvein server
+ *
+ *	TODO Temporarily invalid, keep extension
  */
 func (lv *LeafveinServer) Close() {
 	if nil != lv.listener {
@@ -750,6 +792,7 @@ func (lv *LeafveinServer) Close() {
 		}
 		lv.log.Info("Leafveingo http://%v:%v closed", lv.addr, lv.port)
 		lv.isStart = false
+		lv.free()
 	} else {
 		lv.log.Fatal("current http listener nil, can not be closed")
 	}
@@ -843,41 +886,28 @@ func (lv *LeafveinServer) SessionMaxlifeTime() int32 {
 }
 
 /**
- *	set leafveingo http request supported suffixes. e.g.: (.go),(.htm) ...
- *	default nil, what form can access, the first is the default suffix
+ *	set static resource file suffixes
  *
- *	@param suffixs ".go",".htm"...
+ *	@param suffixes default ".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"
  */
-func (lv *LeafveinServer) SetHTTPSuffixs(suffixs ...string) {
-	for i, v := range suffixs {
-		if 0 != len(v) && v[0] != '.' {
-			suffixs[i] = "." + v
+func (lv *LeafveinServer) SetStaticFileSuffixes(suffixes ...string) {
+
+	if lv.isStart {
+		lv.log.Warn("SetStaticFileSuffixs(...) Leafvein server has been started can not be set.")
+		return
+	}
+
+	lv.staticFileSuffixes = make(map[string]string)
+
+	for i, v := range suffixes {
+		if 0 != len(v) {
+			key := v
+			if key[0] != '.' {
+				key = "." + key
+			}
+			lv.staticFileSuffixes[key] = key
 		}
 	}
-	lv.suffixs = suffixs
-}
-
-/**
- *	get http request supported suffixes
- *
- *	@return
- */
-func (lv *LeafveinServer) HTTPSuffixs() []string {
-	return lv.suffixs
-}
-
-/**
- *	set static resource file suffixs
- *
- *	@param suffixs default ".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"
- */
-func (lv *LeafveinServer) SetStaticFileSuffixs(suffixs ...string) {
-	for i, v := range suffixs {
-		if 0 != len(v) && v[0] != '.' {
-			suffixs[i] = "." + v
-		}
-	}
-	lv.staticFileSuffixs = suffixs
 }
 
 /**
@@ -885,8 +915,17 @@ func (lv *LeafveinServer) SetStaticFileSuffixs(suffixs ...string) {
  *
  *	@return
  */
-func (lv *LeafveinServer) StaticFileSuffixs() []string {
-	return lv.staticFileSuffixs
+func (lv *LeafveinServer) StaticFileSuffixes() []string {
+
+	tempSlice := make([]string, len(lv.staticFileSuffixes))
+
+	i := 0
+	for k, _ := range lv.staticFileSuffixes {
+		tempSlice[i] = k
+		i++
+	}
+
+	return tempSlice
 }
 
 /**
@@ -1035,12 +1074,11 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//	TODO 考虑是否加上读取锁，等测试性能后加上再测试看看。
 
 	var context *HttpContext = nil
+	reqPath := req.URL.Path
 
 	defer lv.deferServeHTTP(context)
 
-	reqPath := req.URL.Path
-
-	//	前缀url清除，主要使用于集成到别的应用内，定义前缀的去除，以便能正确的访问到自己的应用中
+	//	前缀url清除，call GetHandlerFunc() 才会使用到此操作
 	//	/expand/index = /index
 	//	/expand       = /
 	if 0 < len(lv.prefix) {
@@ -1049,51 +1087,58 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			reqPath = "/" + reqPath
 		}
 	}
-
 	if 0 == len(reqPath) {
 		reqPath = "/"
 	}
 
-	//	TODO
-	//	截取后缀
-	reqSuffixs := ""
+	//	get url ext suffix
+	reqSuffix := path.Ext(reqPath)
 
-	//	静态文件解析
-	if reqPath[len(reqPath)-1] != '/' && 0 != len(lv.staticFileSuffixs) {
-		for _, staticSuffixs := range lv.staticFileSuffixs {
-			if strings.HasSuffix(reqPath, staticSuffixs) {
-				filePath := path.Clean(lv.WebRootDir()) + reqPath
+	//	static file handle
+	if 0 != len(reqSuffix) {
+		if _, ok := lv.staticFileSuffixes[reqSuffix]; ok {
+			filePath := lv.WebRootDir() + reqPath
 
-				if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
-					//	处理http.ServeFile函数遇到/index.html被重定向到./的问题
-					if strings.HasSuffix(reqPath, INDEX_PAGE) {
-						// 防止serveFile做判断，具体可以查看http.ServeFile源码
-						req.URL.Path = "/"
-					}
-					http.ServeFile(rw, req, filePath)
-				} else {
-					// 404
-					// http.NotFound(rw, req)
-					lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "", ""), rw)
+			if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
+				//	处理http.ServeFile函数遇到/index.html被重定向到./的问题
+				if strings.HasSuffix(reqPath, INDEX_PAGE) {
+					// 防止serveFile做判断，具体可以查看http.ServeFile源码
+					req.URL.Path = "/"
 				}
-				return
+				http.ServeFile(rw, req, filePath)
+			} else {
+				// 404
+				// http.NotFound(rw, req)
+				lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "", ""), rw)
 			}
+			return
 		}
 	}
 
+	lv.log.Info("request url path: %#v", reqPath)
+
+	//	create context
 	context = newContext(lv, rw, req, lv.isRespWriteCompress)
 
-	routerKey, methodName, urlSuffix, ctrlPath, statusCode := lv.routerParse(reqPath, context)
+	//	router parse
+	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)
 
-	if Status200 == statusCode {
-		var e error = nil
+	if Status200 == statusCode && nil != router {
 		errstr := ""
-		statusCode, e = lv.cellController(routerKey, methodName, urlSuffix, ctrlPath, context)
-		if nil != e {
-			lv.log.Error(e.Error())
-			if lv.isDevel {
-				errstr = e.Error()
-			}
+		var err error = nil
+		funcName := ""
+		tplPath := ""
+
+		//
+		funcName, tplPath, statusCode, err = router.ParseController(context, option)
+
+		if Status200 == statusCode {
+			//TODO
+
+		} else if nil != err {
+			errors = err.Error()
+		} else {
+			errstr = "Unknown Error."
 		}
 
 		switch statusCode {
