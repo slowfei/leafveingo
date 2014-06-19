@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-14
-//  Update on 2013-12-31
+//  Update on 2014-06-15
 //  Email  slowfei@foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -58,6 +58,7 @@ package leafveingo
 
 import (
 	"fmt"
+	"github.com/slowfei/gosfcore/utils/strings"
 	"path"
 	"reflect"
 	"regexp"
@@ -70,7 +71,85 @@ var (
 
 	//	AdeRouterController reflect.Type
 	_arcType = reflect.TypeOf((*AdeRouterController)(nil)).Elem()
+
+	//	globalRouterList
+	_globalRouterList []globalRouter = nil
 )
+
+//
+//	global router
+//
+type globalRouter struct {
+	appName   string
+	routerKey string
+	router    IRouter
+}
+
+/**
+ *	global add router
+ *
+ *	@param appName
+ *	@param routerKey
+ *	@param router
+ */
+func AddRouter(appName, routerKey string, router IRouter) {
+	_globalRouterList = append(_globalRouterList, globalRouter{appName, routerKey, router})
+}
+
+//
+//	router option
+//
+type RouterOption struct {
+	/*
+		GET http://localhost:8080/home/Index.go
+		routerKey 		= "/home/"
+		routerPath 		= "index"
+		requestMethod	= "get"
+		urlSuffix       = ".go"
+	*/
+
+	routerKey     string // have been converted to lowercase
+	routerPath    string //	lowercase
+	requestMethod string // lowercase
+	urlSuffix     string //
+
+	appName string // application name
+}
+
+//
+//	router
+//	TODO
+//
+type IRouter interface {
+
+	/**
+	 *	parse controller
+	 *
+	 *	@param context			http context
+	 *	@param option			router option
+	 *	@return funcName 		function name specifies call
+	 *	@return tplPath			template access path
+	 *	@return statusCode		http status code, 200 pass, other to status page
+	 */
+	ParseController(context *HttpContext, option RouterOption) (funcName, tplPath string, statusCode HttpStatus, err error)
+
+	/**
+	 *	request func
+	 *
+	 *	@param context			http content
+	 *	@param funcName			call controller func name
+	 *	@return returnValue		controller func return value
+	 *	@return statusCode		http status code, 200 pass, other to status page
+	 */
+	CallFunc(context *HttpContext, funcName string) (returnValue interface{}, statusCode HttpStatus, err error)
+
+	/**
+	 *	controller info
+	 *
+	 *	@return
+	 */
+	Info() string
+}
 
 //	高级路由器控制器接口，实现高级路由器机制的控制器需要实现该接口
 //	特别注意，指针添加控制器和值添加的控制器的实现区别
@@ -86,137 +165,44 @@ type AdeRouterController interface {
 	RouterMethodParse(requrl string) (methodName string, params map[string]string)
 }
 
-//	url路由器解析
-//
-//	@param reqPath		request url path
-//	@param context
-//
-//	@return routerKey	parsed router key
-//	@return methodName	parsed controller method name
-//	@return urlSuffix	parsed request url path suffix
-//	@return ctrlPath	parsed controller and method name join path
-//	@return statusCode	http status code
-//
-func (lv *sfLeafvein) routerParse(reqPath string, context *HttpContext) (routerKey, methodName, urlSuffix, ctrlPath string, statusCode HttpStatus) {
-	logInfo := fmt.Sprintf("request url path: %#v", reqPath)
+/**
+ *	router parse
+ *
+ *	@param context
+ *	@param reqPathNoSuffix 		the no suffix request path
+ *	@param reqSuffix			url request suffix
+ */
+func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (router IRouter, option RouterOption, statusCode HttpStatus) {
 
-	suffixIndex := strings.LastIndex(reqPath, ".")
+	statusCode = Status404
 
-	//	记录URL后缀，用于函数后缀使用
-	if -1 < suffixIndex {
-		urlSuffix = reqPath[suffixIndex+1:]
-	}
+	lowerReqPath := SFStringsUtil.ToLower(reqPath)
+	reqPathLen := len(lowerReqPath)
 
-	//	去除url请求后缀
-	//	/index.go = /index
-	if 0 < len(lv.suffixs) && '/' != reqPath[len(reqPath)-1] {
-		//	固定后缀的访问
-		isSuffix := false
-		for _, suffix := range lv.suffixs {
-			if strings.HasSuffix(reqPath, suffix) {
-				reqPath = reqPath[:len(reqPath)-len(suffix)]
-				isSuffix = true
-				break
-			}
-			if 0 == len(suffix) {
-				isSuffix = true
-				break
-			}
-		}
-		if !isSuffix {
-			//	跳转404页面
-			statusCode = Status404
-			logInfo += "\nInvalid suffix"
-			lvLog.Info(logInfo)
-			return
-		}
+	keys := context.lvServer.routerKeys
+	conut := len(keys)
+	for i := 0; i < count; i++ {
+		key := keys[i]
+		keyLen := len(key)
+		if keyLen <= reqPathLen && key == lowerReqPath[:keyLen] {
 
-	} else {
-		//	检测是否有后缀名，有则去除
-		if 0 < suffixIndex {
-			reqPath = reqPath[:suffixIndex]
-		}
-
-	}
-
-	//	验证是否调用控制器解析路由函数方法成功，不成功则调用默认处理机制。
-	isCallSuccess := true
-
-	//	路由器key解析，根据请求的url解析出添加控制器时的router key和函数名
-	if "/" == reqPath {
-		//	选择默认的控制器
-		routerKey = "/"
-	} else {
-		//	遍历添加控制器时设置的router key，匹配是否符合，只要与url前段匹配得上就说明调用该控制器
-		//	controllerKeys已经根据长度由长到短进行排序，完全匹配不了会进入"/"主控制器
-		compareReqPath := strings.ToLower(reqPath)
-		for _, rk := range lv.controllerKeys {
-			if 0 == strings.Index(compareReqPath, rk) {
-				//	methodName为截取控制器key的后段部分
-				methodName = reqPath[len(rk):]
-				routerKey = rk
-				break
-			}
-		}
-
-		//	如果methodName正好被截取为0，表示需要进入的是控制器默认方法，所以可以直接执行默认的处理机制
-		if 0 != len(methodName) {
-			if arcImpl, ok := lv.controllerArcImpls[routerKey]; ok {
-				var params map[string]string = nil
-				methodName, params = arcImpl.RouterMethodParse(reqPath)
-
-				if 0 == len(methodName) {
-					//	404
-					statusCode = Status404
-					lvLog.Info("AdeRouter method pares nil to 404.")
-					return
-				}
-
-				if 0 != len(params) {
-					values := context.Request.URL.Query()
-					for k, v := range params {
-						values.Set(k, v)
-					}
-					context.Request.URL.RawQuery = values.Encode()
-				}
-				isCallSuccess = false
-			}
-		}
-	}
-
-	//	执行函数名的默认处理机制
-	if isCallSuccess {
-		if 0 == len(methodName) {
-			methodName = CONTROLLER_DEFAULT_METHOD
-		} else {
-			//	匹配函数名是否正确
-			if !_rexValidMethodName.MatchString(methodName) {
-				//	404
-				statusCode = Status404
-				return
+			if r, ok := context.lvServer.routers[key]; ok {
+				option.appName = context.lvServer.AppName()
+				option.urlSuffix = reqSuffix
+				option.requestMethod = SFStringsUtil.ToLower(context.Request.Method)
+				option.routerKey = key
+				option.routerPath = lowerReqPath[keyLen:]
+				statusCode = Status200
+				router = r
 			} else {
-				//	控制器的函数名称将首字母转换成大写
-				methodName = strings.Title(methodName)
-
+				//	基本上不会进来此处
+				context.lvServer.log.Error("lv.routerKeys contains %#v and lv.routers not contains %#v", key, key)
+				statusCode = Status404
 			}
+			break
 		}
-
 	}
 
-	//	控制器与函数名链接的路径，主要为了能够默认进入模板路径文件
-	ctrlPath = path.Join(routerKey, strings.ToLower(methodName))
-
-	if "GET" != context.Request.Method {
-		//	每个不同的method进行不同的函数调用
-		//	例如post = PostAbout
-		method := context.Request.Method
-		methodName = strings.Title(strings.ToLower(method)) + methodName
-	}
-
-	logInfo += fmt.Sprintf("\ncontroller   key: %#v   methodName: %#v  urlSuffix: %#v   path: %#v \n", reqPath, methodName, urlSuffix, ctrlPath)
-	lvLog.Info(logInfo)
-
-	statusCode = Status200
 	return
 
 }
