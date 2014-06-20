@@ -26,35 +26,60 @@ import (
 
 var (
 	//	http session manager close status
-	ErrHttpSessionManagerClosed = NewLeafveingoError("HttpSession manager has been closed or not started.")
+	ErrHttpSessionManagerClosed = NewLeafveinError("HttpSession manager has been closed or not started.")
 
-	ErrControllerReturnParam    = NewLeafveingoError("controllers return type parameter error.")
-	ErrControllerReturnParamNum = NewLeafveingoError("controller returns the number of type parameters allowed only one.")
+	ErrControllerReturnParam    = NewLeafveinError("controllers return type parameter error.")
+	ErrControllerReturnParamNum = NewLeafveinError("controller returns the number of type parameters allowed only one.")
 
-	//转发找不到控制器
-	ErrControllerDispatcherNotFound = NewLeafveingoError("dispatcher: controller not found router key:")
+	// 转发找不到控制器
+	ErrControllerDispatcherNotFound    = NewLeafveinError("dispatcher: controller not found.")
+	ErrControllerDispatcherFuncNameNil = NewLeafveinError("dispatcher: func name is nil.")
 
 	//	Leafvein app name repeat
-	ErrLeafveingoAppNameRepeat = NewLeafveingoError("Leafvein server app name repeat.")
+	ErrLeafveingoAppNameRepeat = NewLeafveinError("Leafvein server app name repeat.")
 
 	//	Leafveingo 已经初始化
-	ErrLeafveingoHasbeenInit = NewLeafveingoError("Leafveingo Has been initialized.")
+	ErrLeafveingoHasbeenInit = NewLeafveinError("Leafvein Has been initialized.")
 
 	//	Leafveingo 配置对象未初始化
-	ErrLeafveingoConfigNotInit = NewLeafveingoError("Leafveingo config not initialized.")
+	ErrLeafveingoConfigNotInit = NewLeafveinError("Leafvein config not initialized.")
+
+	//	template path pase is nil
+	ErrTemplatePathParseNil = NewLeafveinError("template path parse is nil.")
 )
 
 //	leafveingo error
-type LeafveingoError struct {
-	Message string
+type LeafveinError struct {
+	Message  string
+	UserInfo string
 }
 
 //	new error info
-func NewLeafveingoError(format string, args ...interface{}) *LeafveingoError {
-	return &LeafveingoError{fmt.Sprintf(format, args...)}
+func NewLeafveinError(format string, args ...interface{}) *LeafveinError {
+	return &LeafveinError{fmt.Sprintf(format, args...), ""}
 }
 
-//	error string
-func (err *LeafveingoError) Error() string {
-	return err.Message
+/**
+ *	error string
+ *
+ *	@return
+ */
+func (err *LeafveinError) Error() string {
+	errstr := "Message:(\"" + err.Message + "\");"
+
+	if 0 != len(err.UserInfo) {
+		errstr += " UserInfo:(\"" + err.UserInfo + "\")"
+	}
+
+	return errstr
+}
+
+/**
+ *	equal error
+ *
+ *	@param
+ *	@return
+ */
+func (err *LeafveinError) Equal(eqErr *LeafveinError) bool {
+	return eqErr.Message == err.Message
 }
