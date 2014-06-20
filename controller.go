@@ -36,372 +36,175 @@ import (
 	"strings"
 )
 
-//	控制器返回参数处理
-func (lv *sfLeafvein) returnValue(v []reflect.Value, ctrURLPath string, context *HttpContext) (statusCode HttpStatus, err error) {
+type BeforeAfterController interface {
+}
+
+//	高级路由器控制器接口，实现高级路由器机制的控制器需要实现该接口
+//	特别注意，指针添加控制器和值添加的控制器的实现区别
+//	指针控制器的实现：	func (c *XxxController) RouterMethodParse...
+//	  值控制器的实现：func (c XxxController) RouterMethodParse...
+type AdeRouterController interface {
+
+	//	路由函数解析，解析工作完全交由现实对象进行。
+	//	@requrl	请求的URL已经将后缀去除
+	//	@return methodName	返回"" to 404，其他则根据返回函数名进行控制器函数的调用
+	//	@return params		需要添加设置的参数，使用context.Request.URL.Query()进行设置，可返回nil。
+	//
+	RouterMethodParse(requrl string) (methodName string, params map[string]string)
+}
+
+/**
+ *	controller call handle
+ *
+ *	@param context
+ *	@param routerKey	the controller router key
+ *	@param funcName		controller call func name
+ *	@param tplPath		template access path, no suffix
+ */
+func controllerCallHandle(context *HttpContext, routerKey, funcName, tplPath string) (statusCode HttpStatus, err error) {
 	statusCode = Status200
+	var returnValue interface{} = nil
 
-	if 1 == len(v) {
-		rv := reflect.Indirect(v[0])
-		// rw.Header().Set("Content-Length", "10000")
-		switch cvt := rv.Interface().(type) {
-		case string:
-			context.RespWrite.Header().Set("Content-Type", "text/plain; charset="+lv.charset)
-			context.RespBodyWrite([]byte(cvt), Status200)
-		case ByteOut:
-			if 0 == len(cvt.ContentType) {
-				context.RespWrite.Header().Set("Content-Type", "text/plain; charset="+lv.charset)
-			} else {
-				context.RespWrite.Header().Set("Content-Type", cvt.ContentType)
-			}
-			for k, v := range cvt.Headers {
-				context.RespWrite.Header().Set(k, v)
-			}
-			context.RespBodyWrite(cvt.Body, Status200)
-		case SFJson.Json:
-			context.RespWrite.Header().Set("Content-Type", "application/json; charset="+lv.charset)
-			context.RespBodyWrite(cvt.Byte(), Status200)
-		case HtmlOut:
-			context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.charset)
-			context.RespBodyWrite([]byte(cvt), Status200)
-		case HttpStatusValue:
-			err := context.StatusPageWriteByValue(cvt)
-			if nil != err {
-				lvLog.Debug(err.Error())
-			}
-		case LVTemplate.TemplateValue:
-			context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.charset)
-			if "" == cvt.TplPath {
-				cvt.TplPath = ctrURLPath + lv.templateSuffix
-			}
-			e := lv.template.Execute(context.ComperssWriter(), cvt)
-			if nil != e {
-				panic(e.Error())
-			}
-		case Redirect:
-			context.RespWrite.Header().Del("Content-Encoding")
-			http.Redirect(context.RespWrite, context.Request, string(cvt), int(Status301))
-			statusCode = Status301
-		case Dispatcher:
-			if 0 == len(cvt.MethodName) {
-				cvt.MethodName = CONTROLLER_DEFAULT_METHOD
-			}
-
-			if ctrlVal, ok := lv.controllers[cvt.Router]; ok {
-				//	需要重新设置控制器路径，以便转发后能够查找到相应的模板
-				dispCtrURLPath := strings.ToLower(cvt.Router + cvt.MethodName)
-
-				//	request的一些设置由调用者直接进行设置Header
-				for k, v := range cvt.Headers {
-					context.Request.Header.Set(k, v)
-				}
-
-				var e error = nil
-				statusCode, e = lv.cellController(cvt.Router, cvt.MethodName, "", dispCtrURLPath, context)
-				if nil != e {
-					lvLog.Error("dispatcher: (%v)controller (%v)method error:%v", ctrlVal.Type().String(), cvt.MethodName, e)
-				}
-			} else {
-				statusCode = Status500
-				//	这个是自定义写代码的转发，如果查找不到相当于是调用者代码问题，所以直接抛出异常（恐慌）。
-				ErrControllerDispatcherNotFound.Message = lvLog.Error("dispatcher: controller not found router key:%v", cvt.Router)
-				panic(ErrControllerDispatcherNotFound)
-			}
-		case ServeFilePath:
-			context.RespWrite.Header().Del("Content-Encoding")
-			filePath := path.Join(lv.WebRootDir(), string(cvt))
-
-			if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
-				http.ServeFile(context.RespWrite, context.Request, filePath)
-			} else {
-				//	404
-				http.NotFound(context.RespWrite, context.Request)
-			}
-
-		default:
-			panic(ErrControllerReturnParam)
-		}
-
-	} else if 1 < len(v) {
-		panic(ErrControllerReturnParamNum)
-	}
-
-	return
-}
-
-//	解析http提交的参数，包括上传文件的信息
-func (lv *sfLeafvein) parseFormParams(req *http.Request) (
-	urlValues url.Values,
-	files map[string][]*multipart.FileHeader,
-	fileNum int,
-	err error,
-	statusCode HttpStatus) {
-
-	switch req.Method {
-	case "GET":
-		urlValues = req.URL.Query()
-	case "POST":
-		contentType := req.Header.Get("Content-Type")
-		enctype, _, e := mime.ParseMediaType(contentType)
-		if nil != e {
-			err = e
-			statusCode = Status400
-			return
-		}
-
-		switch {
-		case enctype == "application/x-www-form-urlencoded":
-			err = req.ParseForm()
-			if nil != err {
-				statusCode = Status400
-				return
-			}
-
-			//	考虑安全因素，让调用则知道请求的参数来自Form还是Query所以进行POST请求就只获取Form的参数
-			urlValues = req.PostForm
-
-		case enctype == "multipart/form-data":
-			err = req.ParseMultipartForm(lv.fileUploadSize)
-			if nil != err {
-				statusCode = Status400
-				return
-			}
-
-			// ParseMultipartForm()解析已经调用了ParseForm()
-			urlValues = url.Values(req.MultipartForm.Value)
-
-			if nil != req.MultipartForm && 0 < len(req.MultipartForm.File) {
-				for k, v := range req.MultipartForm.File {
-					//	添加空字符串的主要目的是为了能够在创建结构时初始化切片的数量
-					urlValues.Set(k, "")
-					fNum := len(v)
-					if 1 < fNum {
-						fileNum += fNum
-					} else {
-						fileNum++
-					}
-				}
-				files = req.MultipartForm.File
-			}
-
-		}
-	default:
-		urlValues = make(url.Values)
-	}
-
-	statusCode = Status200
-	return
-}
-
-//	操作控制器请求的函数
-//	@isPackStruct 是否封装用户自定义的struct
-func (lv *sfLeafvein) cellMethod(
-	methodValue reflect.Value,
-	urlValues url.Values,
-	files map[string][]*multipart.FileHeader,
-	context *HttpContext,
-	isPackStruct bool) []reflect.Value {
-
-	//	内部使用的结构设值
-	setStructValue := func(refValue reflect.Value) {
-		for k, v := range urlValues {
-			count := len(v)
-			switch {
-			case 1 == count:
-				lv.setStructFieldValue(refValue, k, v[0])
-			case 1 < count:
-				lv.setStructFieldValue(refValue, k, v)
-			}
-
-		}
-		for fk, fv := range files {
-			count := len(fv)
-			switch {
-			case 1 == count:
-				lv.setStructFieldValue(refValue, fk, fv[0])
-			case 1 < count:
-				lv.setStructFieldValue(refValue, fk, fv)
-			}
-		}
-	}
-
-	methodType := methodValue.Type()
-	argsNum := methodType.NumIn()
-	args := make([]reflect.Value, argsNum, argsNum)
-
-	for i := 0; i < argsNum; i++ {
-		in := methodType.In(i)
-		typeString := in.String()
-		var argsValue reflect.Value
-
-		switch typeString {
-		case "*http.Request":
-			argsValue = reflect.ValueOf(context.Request)
-		case "http.Request":
-			argsValue = reflect.ValueOf(context.Request).Elem()
-		case "*url.URL":
-			argsValue = reflect.ValueOf(context.Request.URL)
-		case "url.URL":
-			argsValue = reflect.ValueOf(context.Request.URL).Elem()
-		case "*leafveingo.HttpContext":
-			argsValue = reflect.ValueOf(context)
-		case "leafveingo.HttpContext":
-			argsValue = reflect.ValueOf(context).Elem()
-		case "[]uint8":
-			body := context.RequestBody()
-			if nil != body {
-				argsValue = reflect.ValueOf(body)
-			} else {
-				argsValue = reflect.Zero(in)
-			}
-		case "http.ResponseWriter":
-			argsValue = reflect.ValueOf(context.RespWrite)
-		case "LVSession.HttpSession":
-			session, _ := context.Session(false)
-			if nil != session {
-				argsValue = reflect.ValueOf(session)
-			} else {
-				argsValue = reflect.Zero(in)
-			}
-		default:
-			switch in.Kind() {
-			case reflect.Ptr:
-				switch in.Elem().Kind() {
-				case reflect.Struct:
-					if isPackStruct {
-						newValue := lv.newStructPtr(in.Elem(), urlValues)
-						setStructValue(newValue)
-						argsValue = newValue
-					}
-				}
-			case reflect.Struct:
-				if isPackStruct {
-					newValue := lv.newStructPtr(in, urlValues)
-					setStructValue(newValue)
-					argsValue = newValue.Elem()
-				}
-			}
-		}
-
-		if reflect.Invalid == argsValue.Kind() {
-			argsValue = reflect.Zero(in)
-		}
-
-		args[i] = argsValue
-	}
-	return methodValue.Call(args)
-}
-
-//	操作控制器请求的处理
-//
-//	@param routerKey	controller router key
-//	@param methodName	cell controller method name
-//	@param urlSuffix	request url path suffix
-//	@param ctrlPath		controller and method join path
-//	@param context
-//
-//	@return statusCode 	http status code
-//	@return err
-//
-func (lv *sfLeafvein) cellController(routerKey, methodName, urlSuffix, ctrlPath string, context *HttpContext) (statusCode HttpStatus, err error) {
-	ctrlVal, ok := lv.controllers[routerKey]
-
-	if !ok {
-		err = errors.New(lvLog.Error("cellController not found router key:%v", routerKey))
-		statusCode = Status404
-		return
-	}
-
-	//	TODO 考虑看是否真的需要使用slice来进行存储。
 	context.routerKeys = append(context.routerKeys, routerKey)
-	context.methodNames = append(context.methodNames, methodName)
+	context.funcNames = append(context.funcNames, funcName)
 
-	switch ctrlVal.Kind() {
-	case reflect.Ptr:
-		//	指针类型不做操作，直接使用该对象。
-	default:
-		ctrlVal = reflect.New(ctrlVal.Type())
-	}
+	returnValue, statusCode, err = router.CallFunc(context, funcName)
 
-	//	控制器调用方法
-	var requestMethodValue reflect.Value
-
-	//	控制器调用前和后处理的函数
-	var beforeMethodValue reflect.Value
-	isBefore := false
-	var afterMethodValue reflect.Value
-	isAfter := false
-
-	//	是否执行调用控制器方法
-	isCell := false
-
-	//	函数后缀处理
-	if 0 != len(urlSuffix) {
-		if requestMethodValue = ctrlVal.MethodByName(methodName + strings.Title(urlSuffix)); requestMethodValue.IsValid() {
-			isCell = true
-		}
-	}
-	if !isCell {
-		if requestMethodValue = ctrlVal.MethodByName(methodName); requestMethodValue.IsValid() {
-			isCell = true
-		}
-	}
-	if !isCell {
-		err = errors.New(fmt.Sprintf("cellController not found method name:%v", methodName))
-		statusCode = Status404
-		return
-	}
-
-	if isCell {
-
-		//	before and after method
-		if beforeMethodValue = ctrlVal.MethodByName(CONTROLLER_BEFORE_METHOD); beforeMethodValue.IsValid() {
-			isBefore = true
-		}
-		if afterMethodValue = ctrlVal.MethodByName(CONTROLLER_AFTER_METHOD); afterMethodValue.IsValid() {
-			isAfter = true
-		}
-
-		//	请求参数
-		var urlValues url.Values
-		//	上传文件
-		var files map[string][]*multipart.FileHeader
-		//	记录文件请求数量
-		fileNum := 0
-
-		urlValues, files, fileNum, err, statusCode = lv.parseFormParams(context.Request)
-		if Status200 != statusCode {
+	if Status200 == statusCode && nil == err {
+		if nil == returnValue {
 			return
 		}
+		//	return value handle
+		statusCode, err = controllerReturnValueHandle(returnValue, context, routerKey, funcName, tplPath)
+	}
 
-		logInfo := fmt.Sprintf("Request controller: %s \nRequest param: %v\nRequest fileNum: %d\n", ctrlVal.Type(), urlValues, fileNum)
-		lvLog.Info(logInfo)
+	return
+}
 
-		isCellCtrMethod := true
-		if isBefore {
-			returnValues := lv.cellMethod(beforeMethodValue, urlValues, files, context, false)
-			if 1 == len(returnValues) {
-				retVal := returnValues[0]
-				if retVal.Kind() == reflect.Bool {
-					isCellCtrMethod = retVal.Bool()
-				}
+/**
+ *	controller return value handle
+ *
+ *	@param returnValue	call controller return value
+ *	@param context
+ *	@param tplPath template access path, no suffix
+ */
+func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, routerKey, funcName, tplPath string) (statusCode HttpStatus, err error) {
+	statusCode = Status200
+
+	lv := context.lvServer
+	switch cvt := returnValue.(type) {
+	case string:
+
+		context.RespWrite.Header().Set("Content-Type", "text/plain; charset="+lv.Charset())
+		context.RespBodyWrite([]byte(cvt), Status200)
+
+	case ByteOut:
+
+		if 0 == len(cvt.ContentType) {
+			context.RespWrite.Header().Set("Content-Type", "text/plain; charset="+lv.Charset())
+		} else {
+			context.RespWrite.Header().Set("Content-Type", cvt.ContentType)
+		}
+		for k, v := range cvt.Headers {
+			context.RespWrite.Header().Set(k, v)
+		}
+		context.RespBodyWrite(cvt.Body, Status200)
+
+	case SFJson.Json:
+
+		context.RespWrite.Header().Set("Content-Type", "application/json; charset="+lv.Charset())
+		context.RespBodyWrite(cvt.Byte(), Status200)
+
+	case HtmlOut:
+
+		context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.Charset())
+		context.RespBodyWrite([]byte(cvt), Status200)
+
+	case HttpStatusValue:
+
+		err := context.StatusPageWriteByValue(cvt)
+		if nil != err {
+			lvLog.Debug(err.Error())
+		}
+
+	case LVTemplate.TemplateValue:
+
+		context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.Charset())
+		if 0 == len(cvt.TplPath) {
+			if 0 != len(tplPath) {
+				cvt.TplPath = tplPath + lv.templateSuffix
+			} else {
+				panic(ErrTemplatePathParseNil)
 			}
 		}
 
-		if isCellCtrMethod {
-			//	request controller cell method
-			rvs := lv.cellMethod(requestMethodValue, urlValues, files, context, true)
-			//	处理控制器返回值
-			statusCode, err = lv.returnValue(rvs, ctrlPath, context)
+		e := lv.template.Execute(context.ComperssWriter(), cvt)
+
+		if nil != e {
+			panic(NewLeafveinError("template: " + e.Error()))
+		}
+
+	case Redirect:
+
+		context.RespWrite.Header().Del("Content-Encoding")
+		http.Redirect(context.RespWrite, context.Request, string(cvt), int(Status301))
+		statusCode = Status301
+
+	case Dispatcher:
+
+		if 0 == len(cvt.FuncName) {
+			statusCode = Status500
+			panic(ErrControllerDispatcherFuncNameNil)
+		}
+
+		if router, ok := context.lvServer.routers[cvt.RouterKey]; ok {
+			//	request的一些设置由调用者直接进行设置Header
+			for k, v := range cvt.Headers {
+				context.Request.Header.Set(k, v)
+			}
+
+			//	TODO tplPath 看看是否需要重新拼接。或则说还需要调用router.ParseController(context, option)
+			//	dispatcher call
+			controllerCallHandle(context, cvt.RouterKey, cvt.FuncName /*tplPath*/)
+
 		} else {
-			//	请求拒绝
-			statusCode = Status403
-			//	error info is return?
+			statusCode = Status500
+			//	这个是自定义写代码的转发，如果查找不到相当于是调用者代码问题，所以直接抛出异常（恐慌）。
+			err := *ErrControllerDispatcherNotFound
+			err.UserInfo = "router key:" + cvt.RouterKey
+			panic(&err)
 		}
 
-		if isAfter {
-			lv.cellMethod(afterMethodValue, urlValues, files, context, false)
+		if ctrlVal, ok := lv.controllers[cvt.Router]; ok {
+			//	需要重新设置控制器路径，以便转发后能够查找到相应的模板
+			dispCtrURLPath := strings.ToLower(cvt.Router + cvt.MethodName)
+
+			var e error = nil
+			statusCode, e = lv.cellController(cvt.Router, cvt.MethodName, "", dispCtrURLPath, context)
+			if nil != e {
+				lvLog.Error("dispatcher: (%v)controller (%v)method error:%v", ctrlVal.Type().String(), cvt.MethodName, e)
+			}
+		} else {
+			statusCode = Status500
+			//	这个是自定义写代码的转发，如果查找不到相当于是调用者代码问题，所以直接抛出异常（恐慌）。
+			ErrControllerDispatcherNotFound.Message = lvLog.Error("dispatcher: controller not found router key:%v", cvt.Router)
+			panic(ErrControllerDispatcherNotFound)
 		}
 
+	case ServeFilePath:
+
+		context.RespWrite.Header().Del("Content-Encoding")
+		filePath := path.Join(lv.WebRootDir(), string(cvt))
+
+		if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
+			http.ServeFile(context.RespWrite, context.Request, filePath)
+		} else {
+			statusCode = Status404
+		}
+
+	default:
+		panic(ErrControllerReturnParam)
 	}
+
 	return
 }
