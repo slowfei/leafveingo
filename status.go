@@ -13,8 +13,8 @@
 //   limitations under the License.
 //
 //  Create on 2013-11-13
-//  Update on 2013-11-13
-//  Email  slowfei@foxmail.com
+//  Update on 2014-06-20
+//  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
 //	leafveingo web 状态页处理
@@ -93,10 +93,12 @@ func NewHttpStatusValue(status HttpStatus, msg, error, stack string) HttpStatusV
 	return HttpStatusValue{status, data}
 }
 
-//	根据状态获取相应的字符串信息
-//
-//	@status
-//	@return
+/**
+ *	根据状态获取相应的字符串信息
+ *
+ *	@status
+ *	@return
+ */
 func StatusMsg(status HttpStatus) string {
 	msg := ""
 	switch status {
@@ -116,6 +118,35 @@ func StatusMsg(status HttpStatus) string {
 		msg = Status500Msg
 	case Status503:
 		msg = Status503Msg
+	}
+	return msg
+}
+
+/**
+ *	status code convert string
+ *
+ *	@param status
+ *	@return
+ */
+func StatusCodeToString(status HttpStatus) {
+	msg := "-1"
+	switch status {
+	case Status200:
+		msg = "200"
+	case Status301:
+		msg = "301"
+	case Status307:
+		msg = "307"
+	case Status400:
+		msg = "400"
+	case Status403:
+		msg = "403"
+	case Status404:
+		msg = "404"
+	case Status500:
+		msg = "500"
+	case Status503:
+		msg = "503"
 	}
 	return msg
 }
