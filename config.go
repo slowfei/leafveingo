@@ -49,10 +49,6 @@ const (
 	DEFAULT_RESPONSE_WRITE_COMPRESS = true
 	//	default session max life time 1800 seconds
 	DEFAULT_SESSION_MAX_LIFE_TIME = 1800
-	//	default use session
-	DEFAULT_SESSION_USE = true
-	//	default gc session
-	DEFAULT_SESSION_GC = true
 	//	default log channel size
 	DEFAULT_LOG_CHANNEL_SIZE = 5000
 )
@@ -66,6 +62,7 @@ var (
 		"StaticFileSuffixes"	:[".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"],
 		"ServerTimeout"		:0,
 		"SessionMaxlifeTime"	:1800,
+		"IsReqPathIgnoreCase"	: true,
 
 		"TemplateSuffix"	:".tpl",
 		"IsCompactHTML"			:true,
@@ -84,12 +81,13 @@ var (
  *	default see _defaultConfigJson
  */
 type Config struct {
-	AppVersion         string   // app version.
-	FileUploadSize     int64    // file size upload
-	Charset            string   // html encode type
-	StaticFileSuffixes []string // supported static file suffixes
-	ServerTimeout      int64    // server time out, default 0
-	SessionMaxlifeTime int32    // http session maxlife time, unit second. use session set
+	AppVersion          string   // app version.
+	FileUploadSize      int64    // file size upload
+	Charset             string   // html encode type
+	StaticFileSuffixes  []string // supported static file suffixes
+	ServerTimeout       int64    // server time out, default 0
+	SessionMaxlifeTime  int32    // http session maxlife time, unit second. use session set
+	IsReqPathIgnoreCase bool     // request url path ignore case
 
 	TemplateSuffix string // template suffix
 	IsCompactHTML  bool   // is Compact HTML, 默认true
