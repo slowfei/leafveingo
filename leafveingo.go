@@ -218,12 +218,13 @@ type LeafveinServer struct {
 
 	/* #mark optional params, see detailed defaults value to config.go _defaultConfigJson ******************/
 
-	appVersion         string            // app version
-	fileUploadSize     int64             // file size upload
-	charset            string            // html encode type
-	staticFileSuffixes map[string]string // supported static file suffixes
-	serverTimeout      int64             // server time out, default 0
-	sessionMaxlifeTime int32             // http session maxlife time, unit second. use session set
+	appVersion          string            // app version
+	fileUploadSize      int64             // file size upload
+	charset             string            // html encode type
+	staticFileSuffixes  map[string]string // supported static file suffixes
+	serverTimeout       int64             // server time out, default 0
+	sessionMaxlifeTime  int32             // http session maxlife time, unit second. use session set
+	isReqPathIgnoreCase bool              // request url path ignore case
 
 	templateSuffix string // template suffix
 	isCompactHTML  bool   // is Compact HTML, 默认true
@@ -358,6 +359,7 @@ func (lv *LeafveinServer) configReload(cf Config) {
 	lv.SetCharset(cf.Charset)
 	lv.SetStaticFileSuffixes(cf.StaticFileSuffixes)
 	lv.SetSessionMaxlifeTime(cf.SessionMaxlifeTime)
+	lv.SetReqPathIgnoreCase(cf.IsReqPathIgnoreCase)
 	lv.SetTemplateSuffix(cf.TemplateSuffix)
 	lv.SetRespWriteCompress(cf.IsRespWriteCompress)
 	lv.userData = cf.UserData
@@ -432,7 +434,7 @@ func (lv *LeafveinServer) parseRouter(logInfo *string) bool {
 	//	add global touter
 	for _, router := range _globalRouterList {
 		if router.appName == lv.AppName() {
-			lv.AddRouter(router.routerKey, router.router)
+			lv.AddRouter(router.router)
 		}
 	}
 
@@ -648,35 +650,39 @@ func (lv *LeafveinServer) GetHandlerFunc(prefix string) (handler http.Handler, e
  *		$host/admin              = "/"
  *		$host/index              = "/"
  *
- *
- *	@param routerKey	"/" || "/user/" || "/admin". first char must be '/'
  * 	@param router
+ *
  */
-func (lv *LeafveinServer) AddRouter(routerKey string, router IRouter) {
+func (lv *LeafveinServer) AddRouter(router IRouter) {
 
 	if lv.isStart {
 		lv.log.Warn("AddRouter(...) Leafvein server has been started can not be set.")
 		return
 	}
 
+	routerKey := router.RouterKey()
+
 	//	验证添加路由path的规则
 	//	字符串不等于nil || 查询不到"/" || "/" 不在首位
 	if len(routerKey) == 0 || routerKey[0] != '/' {
-		panic(NewLeafveingoError("%T AddRouter routerKey error : %v  reference ( \"/\" | \"/Admin/\" )", controller, routerKey))
+		panic(NewLeafveingoError("AddRouter routerKey error : %#v(%s)  reference ( \"/\" | \"/Admin/\" )", routerKey, router.Info()))
 	}
 
 	if nil == router {
 		return
 	}
 
-	key := strings.ToLower(routerKey)
-	if v, ok := lv.routers[key]; ok {
-		lv.log.Warn("[%#v]router key already exists(IRouter:%v), (IRouter:%v)can not add.", key, v, router)
+	if lv.IsReqPathIgnoreCase() {
+		routerKey = SFStringsUtil.ToLower(routerKey)
+	}
+
+	if v, ok := lv.routers[routerKey]; ok {
+		lv.log.Warn("[%#v]router key already exists(IRouter:%#v), (IRouter:%#v)can not add.", routerKey, v.Info(), router.Info())
 		return
 	}
 
-	lv.routers[key] = router
-	lv.routerKeys = append(lv.routerKeys, key)
+	lv.routers[routerKey] = router
+	lv.routerKeys = append(lv.routerKeys, routerKey)
 
 	//	由长到短进行排序
 	sort.Sort(sort.Reverse(SFStringsUtil.SortLengToShort(lv.routerKeys)))
@@ -883,6 +889,28 @@ func (lv *LeafveinServer) SetSessionMaxlifeTime(second int32) {
  */
 func (lv *LeafveinServer) SessionMaxlifeTime() int32 {
 	return lv.sessionMaxlifeTime
+}
+
+/**
+ *	set request path ignore case
+ *
+ *	@param ignoreCase default true
+ */
+func (lv *LeafveinServer) SetReqPathIgnoreCase(ignoreCase bool) {
+	if lv.isStart {
+		lv.log.Warn("SetReqPathIgnoreCase(...) Leafvein server has been started can not be set.")
+		return
+	}
+	lv.isReqPathIgnoreCase = ignoreCase
+}
+
+/**
+ *	get is request path ignore case
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) IsReqPathIgnoreCase() bool {
+	return lv.isReqPathIgnoreCase
 }
 
 /**
@@ -1106,16 +1134,16 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 					req.URL.Path = "/"
 				}
 				http.ServeFile(rw, req, filePath)
-			} else {
-				// 404
-				// http.NotFound(rw, req)
-				lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "", ""), rw)
+				return
 			}
-			return
+			//	查找不到静态文件交由路由器处理
+			// else {
+			// 	// 404
+			// 	// http.NotFound(rw, req)
+			// 	lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "", ""), rw)
+			// }
 		}
 	}
-
-	lv.log.Info("request url path: %#v", reqPath)
 
 	//	create context
 	context = newContext(lv, rw, req, lv.isRespWriteCompress)
@@ -1123,24 +1151,43 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//	router parse
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)
 
+	lv.log.Info("request url path: [%s,%s,%d]%#v", option.requestMethod, option.routerKey, statusCode, reqPath)
+
 	if Status200 == statusCode && nil != router {
+		//	parse controller
+
 		errstr := ""
 		var err error = nil
 		funcName := ""
 		tplPath := ""
 
-		//
 		funcName, tplPath, statusCode, err = router.ParseController(context, option)
 
-		if Status200 == statusCode {
-			//TODO
+		logInfo := "controller info : " + router.Info() + "\n"
+		logInfo += "func name: [" + funcName + "]" + "\n"
+		logInfo += "template path: " + tplPath + "\n"
+		logInfo += "status sode: " + StatusCodeToString(statusCode) + "\n"
+		lv.log.Info(logInfo)
 
-		} else if nil != err {
-			errors = err.Error()
-		} else {
-			errstr = "Unknown Error."
+		if Status200 == statusCode && nil == err {
+			// call controller func and return value handle
+			statusCode, err = controllerCallHandle(context, option.routerKey, funcName, tplPath)
 		}
 
+		if nil != err {
+			if Status200 == statusCode {
+				statusCode = Status500
+			}
+			errstr = err.Error()
+		} else {
+			switch statusCode {
+			case Status200, Status301, Status307:
+			default:
+				errstr = StatusMsg(statusCode)
+			}
+		}
+
+		//	保留各个状态的特别处理
 		switch statusCode {
 		case Status200, Status301, Status307:
 			//	不作处理的状态
