@@ -44,7 +44,7 @@ type HttpContext struct {
 	reqBody         []byte
 	session         LVSession.HttpSession
 	routerKeys      []string  // router keys
-	methodNames     []string  // request controller method names
+	funcNames       []string  // request controller method names
 	contentEncoding string    // 压缩类型存储
 	comperssWriter  io.Writer //
 	isCloseWriter   bool      // is cell closeWriter()
@@ -255,8 +255,8 @@ func (ctx *HttpContext) RouterKeys() []string {
 }
 
 // request controller methods
-func (ctx *HttpContext) MethodNames() []string {
-	return ctx.methodNames
+func (ctx *HttpContext) FuncNames() []string {
+	return ctx.funcNames
 }
 
 //	response comperss write
