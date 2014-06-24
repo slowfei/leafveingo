@@ -68,6 +68,7 @@ var (
 	Status404 = HttpStatus(404)
 	Status500 = HttpStatus(500)
 	Status503 = HttpStatus(503)
+	StatusNil = HttpStatus(-100)
 )
 
 //	http status code
@@ -127,7 +128,7 @@ func StatusMsg(status HttpStatus) string {
  *	@return
  */
 func StatusCodeToString(status HttpStatus) string {
-	msg := "-1"
+	msg := "null"
 	switch status {
 	case Status200:
 		msg = "200"
