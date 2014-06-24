@@ -29,21 +29,46 @@ import (
 	"path"
 )
 
+//
+//	before after interface
+//
 type BeforeAfterController interface {
+
+	/**
+	 *  before the call controller func
+	 *
+	 *	@param context
+	 *	@param option
+	 *	@return Status200 pass, StatusNil stop Next to proceed, other status jump relevant status page
+	 *
+	 */
+	Before(context *HttpContext, option RouterOption) HttpStatus
+
+	/**
+	 *	after the call controller func
+	 *
+	 * 	@param context
+	 *	@param option
+	 */
+	After(context *HttpContext, option RouterOption)
 }
 
+//
 //	高级路由器控制器接口，实现高级路由器机制的控制器需要实现该接口
 //	特别注意，指针添加控制器和值添加的控制器的实现区别
 //	指针控制器的实现：	func (c *XxxController) RouterMethodParse...
 //	  值控制器的实现：func (c XxxController) RouterMethodParse...
+//
 type AdeRouterController interface {
 
-	//	路由函数解析，解析工作完全交由现实对象进行。
-	//	@requrl	请求的URL已经将后缀去除
-	//	@return methodName	返回"" to 404，其他则根据返回函数名进行控制器函数的调用
-	//	@return params		需要添加设置的参数，使用context.Request.URL.Query()进行设置，可返回nil。
-	//
-	RouterMethodParse(requrl string) (methodName string, params map[string]string)
+	/**
+	 *	路由函数解析，解析工作完全交由现实对象进行。
+	 *
+	 *	@param option router params option
+	 *	@return funcName	is "" jump 404 page, other by name call controller
+	 *	@return params		add to request form param, use set Request.URL.Query()
+	 */
+	RouterMethodParse(option RouterOption) (funcName string, params map[string]string)
 }
 
 /**
@@ -83,16 +108,21 @@ func controllerCallHandle(context *HttpContext, router IRouter, option RouterOpt
 	context.routerKeys = append(context.routerKeys, option.routerKey)
 	context.funcNames = append(context.funcNames, funcName)
 
-	returnValue, statusCode, err = router.CallFunc(context, funcName)
+	//	before
+	statusCode = router.CallFuncBefore(context, option)
+	if Status200 == statusCode {
+		//	exce call
+		returnValue, statusCode, err = router.CallFunc(context, funcName)
 
-	if Status200 == statusCode && nil == err {
-		if nil == returnValue {
-			return
+		if Status200 == statusCode && nil == err {
+			if nil != returnValue {
+				//	return value handle
+				statusCode, err = controllerReturnValueHandle(returnValue, context, router, option, funcName)
+			}
 		}
-		//	return value handle
-		statusCode, err = controllerReturnValueHandle(returnValue, context, router, option, funcName)
-
 	}
+	//	after
+	router.CallFuncAfter(context, option)
 
 	return
 }
@@ -147,7 +177,7 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 
 		context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.Charset())
 		if 0 == len(cvt.TplPath) {
-			cvt.TplPath = router.ParseTemplatePath(context, funcName)
+			cvt.TplPath = router.ParseTemplatePath(context, funcName, option)
 		}
 
 		if 0 == len(cvt.TplPath) {

@@ -97,9 +97,10 @@ type IRouter interface {
 	 *
 	 *	@param context
 	 *	@param funcName	controller call func name
+	 *	@param option	router option
 	 *	@return template path, suggest "[routerKey]/[funcName]"
 	 */
-	ParseTemplatePath(context *HttpContext, funcName string) string
+	ParseTemplatePath(context *HttpContext, funcName string, option RouterOption) string
 
 	/**
 	 *	request func
@@ -110,6 +111,23 @@ type IRouter interface {
 	 *	@return statusCode		http status code, 200 pass, other to status page
 	 */
 	CallFunc(context *HttpContext, funcName string) (returnValue interface{}, statusCode HttpStatus, err error)
+
+	/**
+	 *	before call func
+	 *
+	 *	@param context
+	 *	@param option
+	 *	@return HttpStatus
+	 */
+	CallFuncBefore(context *HttpContext, option RouterOption) HttpStatus
+
+	/**
+	 *	after call func
+	 *
+	 *	@param context
+	 *	@param option
+	 */
+	CallFuncAfter(context *HttpContext, option RouterOption)
 
 	/**
 	 *	controller info
