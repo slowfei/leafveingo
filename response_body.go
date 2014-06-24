@@ -24,6 +24,7 @@ package leafveingo
 
 import (
 	"github.com/slowfei/gosfcore/encoding/json"
+	"github.com/slowfei/gosfcore/log"
 	"github.com/slowfei/leafveingo/template"
 )
 
@@ -66,7 +67,7 @@ func BodyJson(value interface{}) SFJson.Json {
 	json, error := SFJson.NewJson(value, "", "")
 
 	if nil != error {
-		lvLog.Error("BodyJson json error:%v", error)
+		SFLog.Error("BodyJson json error:%v", error)
 		json = SFJson.NewJsonNil(true)
 	}
 
@@ -158,7 +159,7 @@ func BodyCallControllerByHeaders(routerKey, funcName string, setHeaders map[stri
  *	@return ServeFilePath
  */
 func BodyServeFile(path string) ServeFilePath {
-	//	TODO 输出文件的保存名称默认可能是url的地址结尾名称，这个可能需要优化。
+	//	TODO 输出文件的浏览器保存时名称默认可能是url的地址结尾名称，这个可能需要优化。
 	return ServeFilePath(path)
 }
 

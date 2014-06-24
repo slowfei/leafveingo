@@ -13,8 +13,8 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-16
-//  Update on 2013-12-31
-//  Email  slowfei@foxmail.com
+//  Update on 2014-06-23
+//  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
 //	leafveingo web 的控制器操作
@@ -22,18 +22,11 @@
 package leafveingo
 
 import (
-	"errors"
-	"fmt"
 	"github.com/slowfei/gosfcore/encoding/json"
 	"github.com/slowfei/gosfcore/utils/filemanager"
 	"github.com/slowfei/leafveingo/template"
-	"mime"
-	"mime/multipart"
 	"net/http"
-	"net/url"
 	"path"
-	"reflect"
-	"strings"
 )
 
 type BeforeAfterController interface {
@@ -57,15 +50,37 @@ type AdeRouterController interface {
  *	controller call handle
  *
  *	@param context
- *	@param routerKey	the controller router key
+ *	@param router		router interface implement object
+ *	@param option		router params option
  *	@param funcName		controller call func name
- *	@param tplPath		template access path, no suffix
+ *	@param isDisp		is Dispatcher
+ *	@param dispFunaName no dispatcher to nil
  */
-func controllerCallHandle(context *HttpContext, routerKey, funcName, tplPath string) (statusCode HttpStatus, err error) {
-	statusCode = Status200
+func controllerCallHandle(context *HttpContext, router IRouter, option RouterOption, isDisp bool, dispFunaName string) (statusCode HttpStatus, err error) {
+
+	var funcName string = ""
 	var returnValue interface{} = nil
 
-	context.routerKeys = append(context.routerKeys, routerKey)
+	//	parse func name
+	dispstr := ""
+	if isDisp {
+		dispstr = "(dispatcher)"
+		funcName = dispFunaName
+		statusCode = Status200
+		err = nil
+	} else {
+		funcName, statusCode, err = router.ParseFuncName(context, option)
+	}
+
+	logInfo := "controller info" + dispstr + ": " + router.Info() + "\n"
+	logInfo += "func name: [" + funcName + "]" + "\n"
+	context.lvServer.log.Info(logInfo)
+
+	if Status200 != statusCode || nil != err {
+		return
+	}
+
+	context.routerKeys = append(context.routerKeys, option.routerKey)
 	context.funcNames = append(context.funcNames, funcName)
 
 	returnValue, statusCode, err = router.CallFunc(context, funcName)
@@ -75,7 +90,8 @@ func controllerCallHandle(context *HttpContext, routerKey, funcName, tplPath str
 			return
 		}
 		//	return value handle
-		statusCode, err = controllerReturnValueHandle(returnValue, context, routerKey, funcName, tplPath)
+		statusCode, err = controllerReturnValueHandle(returnValue, context, router, option, funcName)
+
 	}
 
 	return
@@ -88,7 +104,7 @@ func controllerCallHandle(context *HttpContext, routerKey, funcName, tplPath str
  *	@param context
  *	@param tplPath template access path, no suffix
  */
-func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, routerKey, funcName, tplPath string) (statusCode HttpStatus, err error) {
+func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, router IRouter, option RouterOption, funcName string) (statusCode HttpStatus, err error) {
 	statusCode = Status200
 
 	lv := context.lvServer
@@ -124,23 +140,27 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 
 		err := context.StatusPageWriteByValue(cvt)
 		if nil != err {
-			lvLog.Debug(err.Error())
+			lv.log.Debug(err.Error())
 		}
 
 	case LVTemplate.TemplateValue:
 
 		context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.Charset())
 		if 0 == len(cvt.TplPath) {
-			if 0 != len(tplPath) {
-				cvt.TplPath = tplPath + lv.templateSuffix
-			} else {
-				panic(ErrTemplatePathParseNil)
-			}
+			cvt.TplPath = router.ParseTemplatePath(context, funcName)
 		}
+
+		if 0 == len(cvt.TplPath) {
+			statusCode = Status500
+			panic(ErrTemplatePathParseNil)
+		}
+
+		lv.log.Info("access template path: \"" + cvt.TplPath + "\"")
 
 		e := lv.template.Execute(context.ComperssWriter(), cvt)
 
 		if nil != e {
+			statusCode = Status500
 			panic(NewLeafveinError("template: " + e.Error()))
 		}
 
@@ -163,32 +183,17 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 				context.Request.Header.Set(k, v)
 			}
 
-			//	TODO tplPath 看看是否需要重新拼接。或则说还需要调用router.ParseController(context, option)
-			//	dispatcher call
-			controllerCallHandle(context, cvt.RouterKey, cvt.FuncName /*tplPath*/)
+			//	TODO 这样转发可能存在隐藏性的问题，关键在于option的作用。但目前的代码设计来说还不存在大的问题。
+			option.routerKey = cvt.RouterKey
+			option.routerPath = ""
+			statusCode, err = controllerCallHandle(context, router, option, true, cvt.FuncName)
 
 		} else {
 			statusCode = Status500
 			//	这个是自定义写代码的转发，如果查找不到相当于是调用者代码问题，所以直接抛出异常（恐慌）。
-			err := *ErrControllerDispatcherNotFound
-			err.UserInfo = "router key:" + cvt.RouterKey
-			panic(&err)
-		}
-
-		if ctrlVal, ok := lv.controllers[cvt.Router]; ok {
-			//	需要重新设置控制器路径，以便转发后能够查找到相应的模板
-			dispCtrURLPath := strings.ToLower(cvt.Router + cvt.MethodName)
-
-			var e error = nil
-			statusCode, e = lv.cellController(cvt.Router, cvt.MethodName, "", dispCtrURLPath, context)
-			if nil != e {
-				lvLog.Error("dispatcher: (%v)controller (%v)method error:%v", ctrlVal.Type().String(), cvt.MethodName, e)
-			}
-		} else {
-			statusCode = Status500
-			//	这个是自定义写代码的转发，如果查找不到相当于是调用者代码问题，所以直接抛出异常（恐慌）。
-			ErrControllerDispatcherNotFound.Message = lvLog.Error("dispatcher: controller not found router key:%v", cvt.Router)
-			panic(ErrControllerDispatcherNotFound)
+			dnfErr := *ErrControllerDispatcherNotFound
+			dnfErr.UserInfo = "router key:" + cvt.RouterKey
+			panic(&dnfErr)
 		}
 
 	case ServeFilePath:

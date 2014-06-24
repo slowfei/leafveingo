@@ -13,15 +13,19 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-16
-//  Update on 2013-10-23
-//  Email  slowfei@foxmail.com
+//  Update on 2014-06-24
+//  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
 //	leafveingo web form的参数解析封装结构
 package leafveingo
 
 import (
+	"github.com/slowfei/gosfcore/log"
 	"github.com/slowfei/gosfcore/utils/reflect"
+	"mime"
+	"mime/multipart"
+	"net/http"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -34,102 +38,88 @@ var (
 	_arrayTagRex = regexp.MustCompile("\\[\\d*\\]")
 )
 
-//	设置参数值
 //
-//	@param sutValue 	字段的反射对象
-//	@param fieldName 	字段名
-//	@param value	 	需要设置的值
+//	form params pack struct
 //
-func (lv *sfLeafvein) setParamValue(fieldValue reflect.Value, fieldName string, value interface{}) {
-	err := SFReflectUtil.SetBaseTypeValue(fieldValue, value)
-	if nil != err {
-		lvLog.Error("%s set value error: %s", fieldName, err.Error())
-	}
+type parampack struct {
+	params  url.Values                         // form or get params
+	files   map[string][]*multipart.FileHeader // file
+	fileNum int                                // all file number
 }
 
-//	过滤参数封装一些系统的struct
-//	在有些设置结构参数时，系统的struct不必要再递归分析
-//	@return true 属于过滤字段 false不是过滤的字段
-func (lv *sfLeafvein) filterParamPackStructType(valueType reflect.Type) bool {
-	result := true
-	// strings.Index(fieldValue.Type().String(), "multipart.FileHeader")
-	switch valueType.String() {
-	case "[]multipart.FileHeader", "[]*multipart.FileHeader", "*multipart.FileHeader", "multipart.FileHeader":
-	case "":
-		lvLog.Error("can not read type.String() : %v", valueType)
-	default:
-		result = false
-	}
-	return result
-}
+/**
+ *	parse form
+ *
+ *	@param req
+ *	@return param		form params pack struct
+ *	@return err
+ */
+func parampackParseForm(req *http.Request, fileUploadSize int64) (param *parampack, err error) {
 
-//	针对字段进行设值
-//
-//	@param fieldValue		字段反射对象
-//	@param fieldName		字段名，以便递归寻找下个设值字段
-//	@param fieldSplitName	字段名分割集合，以"."进行分割，主要是为了递归子字段进行拼接传递
-//	@param value			设置值
-//
-func (lv *sfLeafvein) setFieldValue(fieldValue reflect.Value, fieldName string, fieldSplitName []string, value interface{}) {
-
-	if fieldValue.IsValid() {
-
-		//	为递归下一个参数做准备，保留后面的参数名(tag.TagName)
-		isRec := false
-		joinLaterFieldName := ""
-		if 1 < len(fieldSplitName) {
-			joinLaterFieldName = strings.Join(fieldSplitName[1:], ".")
-			isRec = true
-			//	进入这里表明还需要进行一次字段查询，所以需要进行递归操作，直到截取到最后一位的参数名标识(TagName)
+	switch req.Method {
+	case "GET":
+		param = new(parampack)
+		param.params = req.URL.Query()
+	case "POST":
+		contentType := req.Header.Get("Content-Type")
+		enctype, _, e := mime.ParseMediaType(contentType)
+		if nil != e {
+			err = e
+			return
 		}
 
-		switch fieldValue.Kind() {
-		case reflect.Ptr:
+		param = new(parampack)
 
-			if fieldValue.IsNil() {
-				fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
+		switch {
+		case enctype == "application/x-www-form-urlencoded":
+			err = req.ParseForm()
+			if nil != err {
+				return
+			}
+			//	考虑安全因素，让调用则知道请求的参数来自Form还是Query所以进行POST请求就只获取Form的参数
+			param.params = req.PostForm
+
+		case enctype == "multipart/form-data":
+			err = req.ParseMultipartForm(fileUploadSize)
+			if nil != err {
+				return
 			}
 
-			//	指针与非指针区分开，主要是在进行参数设值的时候对应与设置值相同的类型，减免指针的过多操作。
-			switch fieldValue.Elem().Kind() {
-			case reflect.Struct:
-				if isRec && !lv.filterParamPackStructType(fieldValue.Type().Elem()) {
-					lv.setStructFieldValue(fieldValue, joinLaterFieldName, value)
-				} else {
-					lv.setParamValue(fieldValue, fieldName, value)
+			// ParseMultipartForm()解析已经调用了ParseForm()
+			param.params = url.Values(req.MultipartForm.Value)
+
+			if nil != req.MultipartForm && 0 < len(req.MultipartForm.File) {
+				for k, v := range req.MultipartForm.File {
+					//	添加空字符串的主要目的是为了能够在创建结构时初始化切片的数量
+					param.params.Set(k, "")
+					fNum := len(v)
+					if 1 < fNum {
+						param.fileNum += fNum
+					} else {
+						param.fileNum++
+					}
 				}
-
-			case reflect.Slice:
-				//	如果属于切片类型，传递fieldName主要是在操作一遍集合元素的赋值，因为不是结构类型无需再向下查找
-				lv.setStructFieldValue(fieldValue, fieldName, value)
-			default:
-				lv.setParamValue(fieldValue, fieldName, value)
+				param.files = req.MultipartForm.File
 			}
 
-		case reflect.Struct:
-
-			if isRec && !lv.filterParamPackStructType(fieldValue.Type()) {
-				lv.setStructFieldValue(fieldValue, joinLaterFieldName, value)
-			} else {
-				//	如果检测的是系统或则非用户定义的struct就可以直接赋值了，赋值那里已经做了匹配类型才进行赋值的处理
-				lv.setParamValue(fieldValue, fieldName, value)
-			}
-		case reflect.Slice:
-			lv.setStructFieldValue(fieldValue, fieldName, value)
-		default:
-			lv.setParamValue(fieldValue, fieldName, value)
 		}
-
+	default:
+		param = new(parampack)
+		param.params = make(url.Values)
 	}
+
+	return
 }
 
-//	根据field的字段名称设置struct字段属性值
-//	字段名称可为"type.tag.TagName", 以"."作为子字段的名称分割
-//
-//	@param sutValue		被设值的结构反射类型
-//	@param fieldName	字段名(type.tag.TagName) or (tagnName)
-//	@param value		设值值
-func (lv *sfLeafvein) setStructFieldValue(sutValue reflect.Value, fieldName string, value interface{}) {
+/**
+ *	根据field的字段名称设置struct字段属性值
+ *	字段名称可为"type.tag.TagName", 以"."作为子字段的名称分割
+ *
+ *	@param sutValue		被设值的结构反射类型
+ *	@param fieldName	字段名(type.tag.TagName) or (tagnName)
+ *	@param value		设值值
+ */
+func parampackSetStructFieldValue(sutValue reflect.Value, fieldName string, value interface{}) {
 	fieldName = strings.TrimSpace(fieldName)
 	sutValueElem := reflect.Indirect(sutValue)
 
@@ -149,7 +139,7 @@ func (lv *sfLeafvein) setStructFieldValue(sutValue reflect.Value, fieldName stri
 			//	判断如果是数组类型，但是设值的字段名称不是数组的标识则跳过(数组标识Users[0])
 			//	由于有可能是需要直接设置数组参数，但是字段名称中(childFieldName = "Files")中未包含"[\d]"的标识
 			//	所以尝试直接设值
-			lv.setParamValue(sutValueElem, fieldName, value)
+			parampackSetParamValue(sutValueElem, fieldName, value)
 			return
 		}
 
@@ -157,7 +147,7 @@ func (lv *sfLeafvein) setStructFieldValue(sutValue reflect.Value, fieldName stri
 		if nil == e && intIndex < sutValueElem.Len() {
 			fieldValue := sutValueElem.Index(intIndex)
 
-			lv.setFieldValue(fieldValue, fieldName, fieldsName, value)
+			parampackSetFieldValue(fieldValue, fieldName, fieldsName, value)
 		}
 
 	} else {
@@ -172,18 +162,18 @@ func (lv *sfLeafvein) setStructFieldValue(sutValue reflect.Value, fieldName stri
 		//	查找字段
 		fieldValue := sutValueElem.FieldByName(childFieldName)
 
-		lv.setFieldValue(fieldValue, fieldName, fieldsName, value)
+		parampackSetFieldValue(fieldValue, fieldName, fieldsName, value)
 	}
 }
 
-//
-//	根据url和form参数信息创建一个struct体，如果存在集合结构会根据form参数信息make分配切片大小。
-//
-//	@param structType 需要操作的的结构
-//	@param urlValues  url或form请求参数(主要为了操作slice的创建元素)
-//	@return	返回创建好的函数反射对象信息（指针类型的）
-//
-func (lv *sfLeafvein) newStructPtr(structType reflect.Type, urlValues url.Values) reflect.Value {
+/**
+ *	根据url和form参数信息创建一个struct体，如果存在集合结构会根据form参数信息make分配切片大小。
+ *
+ *	@param structType 需要操作的的结构
+ *	@param urlValues  url或form请求参数(主要为了操作slice的创建元素)
+ *	@return	返回创建好的函数反射对象信息（指针类型的）
+ */
+func parampackNewStructPtr(structType reflect.Type, urlValues url.Values) reflect.Value {
 	//	考虑到结构内包含指针，如果不进行new的话直接(.)会爆出空指针异常，所以这里需要遍历每个对象
 
 	if structType.Kind() != reflect.Struct {
@@ -244,20 +234,19 @@ func (lv *sfLeafvein) newStructPtr(structType reflect.Type, urlValues url.Values
 	//	end 分析数组
 
 	//	执行递归子字段操作
-	lv.newStructFindFiled(structValue, "", arraySizeMap)
+	parampackNewStructFindFiled(structValue, "", arraySizeMap)
 
 	return structValue
 }
 
-//
-//	创建结构体递归遍历子字段操作
-//
-//	@param structV			递归操作字段
-//	@param joinFieldName	字段连接名
-//	@param arraySizeMap		解析后的集合数量设值map
-//
-//
-func (lv *sfLeafvein) newStructFindFiled(structV reflect.Value, joinFieldName string, arraySizeMap map[string]int) {
+/**
+ *	创建结构体递归遍历子字段操作
+ *
+ *	@param structV			递归操作字段
+ *	@param joinFieldName	字段连接名
+ *	@param arraySizeMap		解析后的集合数量设值map
+ */
+func parampackNewStructFindFiled(structV reflect.Value, joinFieldName string, arraySizeMap map[string]int) {
 	structV = reflect.Indirect(structV)
 	if reflect.Struct != structV.Kind() {
 		return
@@ -285,8 +274,8 @@ func (lv *sfLeafvein) newStructFindFiled(structV reflect.Value, joinFieldName st
 
 		switch reflect.Indirect(childField).Kind() {
 		case reflect.Struct:
-			if !lv.filterParamPackStructType(childField.Type()) {
-				lv.newStructFindFiled(childField, joinFieldName+childFieldName, arraySizeMap)
+			if !parampackFilterParamPackStructType(childField.Type()) {
+				parampackNewStructFindFiled(childField, joinFieldName+childFieldName, arraySizeMap)
 			}
 		case reflect.Slice:
 
@@ -298,7 +287,7 @@ func (lv *sfLeafvein) newStructFindFiled(structV reflect.Value, joinFieldName st
 				valueElem.Set(reflect.MakeSlice(valueElem.Type(), sliceSize, sliceSize))
 
 				//	继续执行集合子元素的遍历
-				if !lv.filterParamPackStructType(valueElem.Type()) {
+				if !parampackFilterParamPackStructType(valueElem.Type()) {
 					for j := 0; j < sliceSize; j++ {
 						childIndex := valueElem.Index(j)
 
@@ -310,10 +299,105 @@ func (lv *sfLeafvein) newStructFindFiled(structV reflect.Value, joinFieldName st
 						//	当前由于是数组类型，所以传递连接名的时候加上"[index]"下标往下进行操作
 						tempJoinName = joinFieldName + childFieldName + "[" + strconv.Itoa(j) + "]"
 
-						lv.newStructFindFiled(childIndex, tempJoinName, arraySizeMap)
+						parampackNewStructFindFiled(childIndex, tempJoinName, arraySizeMap)
 					}
 				}
 			}
 		}
+	}
+}
+
+/**
+ *	set param value
+ *
+ *	@param fieldValue 字段的反射对象
+ *	@param fieldName  字段名
+ *	@param value	  set value
+ */
+func parampackSetParamValue(fieldValue reflect.Value, fieldName string, value interface{}) {
+	err := SFReflectUtil.SetBaseTypeValue(fieldValue, value)
+	if nil != err {
+		SFLog.Error("%s set value error: %s", fieldName, err.Error())
+
+	}
+}
+
+/**
+ *	过滤参数封装一些系统的struct
+ *	在有些设置结构参数时，系统的struct不必要再递归分析
+ *
+ *	@return true 属于过滤字段 false不是过滤的字段
+ */
+func parampackFilterParamPackStructType(valueType reflect.Type) bool {
+	result := true
+	// strings.Index(fieldValue.Type().String(), "multipart.FileHeader")
+	switch valueType.String() {
+	case "[]multipart.FileHeader", "[]*multipart.FileHeader", "*multipart.FileHeader", "multipart.FileHeader":
+	case "":
+		SFLog.Error("can not read type.String() : %v", valueType)
+	default:
+		result = false
+	}
+	return result
+}
+
+/**
+ *	针对字段进行设值
+ *
+ *	@param fieldValue		字段反射对象
+ *	@param fieldName		字段名，以便递归寻找下个设值字段
+ *	@param fieldSplitName	字段名分割集合，以"."进行分割，主要是为了递归子字段进行拼接传递
+ *	@param value			设置值
+ */
+func parampackSetFieldValue(fieldValue reflect.Value, fieldName string, fieldSplitName []string, value interface{}) {
+
+	if fieldValue.IsValid() {
+
+		//	为递归下一个参数做准备，保留后面的参数名(tag.TagName)
+		isRec := false
+		joinLaterFieldName := ""
+		if 1 < len(fieldSplitName) {
+			joinLaterFieldName = strings.Join(fieldSplitName[1:], ".")
+			isRec = true
+			//	进入这里表明还需要进行一次字段查询，所以需要进行递归操作，直到截取到最后一位的参数名标识(TagName)
+		}
+
+		switch fieldValue.Kind() {
+		case reflect.Ptr:
+
+			if fieldValue.IsNil() {
+				fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
+			}
+
+			//	指针与非指针区分开，主要是在进行参数设值的时候对应与设置值相同的类型，减免指针的过多操作。
+			switch fieldValue.Elem().Kind() {
+			case reflect.Struct:
+				if isRec && !parampackFilterParamPackStructType(fieldValue.Type().Elem()) {
+					parampackSetStructFieldValue(fieldValue, joinLaterFieldName, value)
+				} else {
+					parampackSetParamValue(fieldValue, fieldName, value)
+				}
+
+			case reflect.Slice:
+				//	如果属于切片类型，传递fieldName主要是在操作一遍集合元素的赋值，因为不是结构类型无需再向下查找
+				parampackSetStructFieldValue(fieldValue, fieldName, value)
+			default:
+				parampackSetParamValue(fieldValue, fieldName, value)
+			}
+
+		case reflect.Struct:
+
+			if isRec && !parampackFilterParamPackStructType(fieldValue.Type()) {
+				parampackSetStructFieldValue(fieldValue, joinLaterFieldName, value)
+			} else {
+				//	如果检测的是系统或则非用户定义的struct就可以直接赋值了，赋值那里已经做了匹配类型才进行赋值的处理
+				parampackSetParamValue(fieldValue, fieldName, value)
+			}
+		case reflect.Slice:
+			parampackSetStructFieldValue(fieldValue, fieldName, value)
+		default:
+			parampackSetParamValue(fieldValue, fieldName, value)
+		}
+
 	}
 }

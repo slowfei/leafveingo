@@ -13,8 +13,8 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-14
-//  Update on 2014-06-20
-//  Email  slowfei@foxmail.com
+//  Update on 2014-06-23
+//  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
 //
@@ -23,16 +23,10 @@
 package leafveingo
 
 import (
-	"fmt"
 	"github.com/slowfei/gosfcore/utils/strings"
-	"path"
-	"reflect"
-	"regexp"
-	"strings"
 )
 
 var (
-
 	//	globalRouterList
 	_globalRouterList []globalRouter = nil
 )
@@ -52,7 +46,7 @@ type globalRouter struct {
  *	@param routerKey
  *	@param router
  */
-func AddRouter(appName, router IRouter) {
+func AddRouter(appName string, router IRouter) {
 	_globalRouterList = append(_globalRouterList, globalRouter{appName, router})
 }
 
@@ -70,7 +64,7 @@ type RouterOption struct {
 
 	routerKey     string //
 	routerPath    string //	have been converted to lowercase
-	requestMethod string // lowercase
+	requestMethod string //	GET POST ...
 	urlSuffix     string //
 
 	appName string // application name
@@ -88,15 +82,24 @@ type IRouter interface {
 	RouterKey() string
 
 	/**
-	 *	parse controller
+	 *	parse func name
 	 *
 	 *	@param context			http context
 	 *	@param option			router option
 	 *	@return funcName 		function name specifies call
-	 *	@return tplPath			template access path, does not require the suffix
 	 *	@return statusCode		http status code, 200 pass, other to status page
 	 */
-	ParseController(context *HttpContext, option RouterOption) (funcName, tplPath string, statusCode HttpStatus, err error)
+	ParseFuncName(context *HttpContext, option RouterOption) (funcName string, statusCode HttpStatus, err error)
+
+	/**
+	 *	parse template path
+	 *	no need to add the suffix
+	 *
+	 *	@param context
+	 *	@param funcName	controller call func name
+	 *	@return template path, suggest "[routerKey]/[funcName]"
+	 */
+	ParseTemplatePath(context *HttpContext, funcName string) string
 
 	/**
 	 *	request func
@@ -137,7 +140,7 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 	reqPathLen := len(lowerReqPath)
 
 	keys := context.lvServer.routerKeys
-	conut := len(keys)
+	count := len(keys)
 	for i := 0; i < count; i++ {
 		key := keys[i]
 		keyLen := len(key)
@@ -146,7 +149,7 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 			if r, ok := context.lvServer.routers[key]; ok {
 				option.appName = context.lvServer.AppName()
 				option.urlSuffix = reqSuffix
-				option.requestMethod = SFStringsUtil.ToLower(context.Request.Method)
+				option.requestMethod = context.Request.Method //SFStringsUtil.ToLower(context.Request.Method)
 				option.routerKey = key
 				option.routerPath = lowerReqPath[keyLen:]
 				statusCode = Status200

@@ -36,16 +36,18 @@ var (
 	ErrControllerDispatcherFuncNameNil = NewLeafveinError("dispatcher: func name is nil.")
 
 	//	Leafvein app name repeat
-	ErrLeafveingoAppNameRepeat = NewLeafveinError("Leafvein server app name repeat.")
-
-	//	Leafveingo 已经初始化
-	ErrLeafveingoHasbeenInit = NewLeafveinError("Leafvein Has been initialized.")
+	ErrLeafveinAppNameRepeat = NewLeafveinError("Leafvein server app name repeat.")
 
 	//	Leafveingo 配置对象未初始化
-	ErrLeafveingoConfigNotInit = NewLeafveinError("Leafvein config not initialized.")
+	ErrLeafveinInitLoadConfig    = NewLeafveinError("Leafvein initialized load config error.")
+	ErrLeafveinLoadDefaultConfig = NewLeafveinError("Leafvein load default config error.")
 
 	//	template path pase is nil
 	ErrTemplatePathParseNil = NewLeafveinError("template path parse is nil.")
+
+	//	form params
+	ErrParampackParseFormParams = NewLeafveinError("form params parse error.")
+	ErrParampackNewStruct       = NewLeafveinError("form params new struct error.")
 )
 
 //	leafveingo error

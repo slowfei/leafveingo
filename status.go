@@ -21,8 +21,6 @@
 package leafveingo
 
 import (
-	"io"
-	"net/http"
 	"strconv"
 )
 
@@ -128,7 +126,7 @@ func StatusMsg(status HttpStatus) string {
  *	@param status
  *	@return
  */
-func StatusCodeToString(status HttpStatus) {
+func StatusCodeToString(status HttpStatus) string {
 	msg := "-1"
 	switch status {
 	case Status200:

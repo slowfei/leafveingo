@@ -13,8 +13,8 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-13
-//  Update on 2013-10-23
-//  Email  slowfei@foxmail.com
+//  Update on 2014-06-24
+//  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
 //	leafveingo web 每次请求的上下文封装
@@ -28,6 +28,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strings"
 )
 
@@ -40,14 +41,16 @@ type HttpContext struct {
 	//	TODO 预留改版的扩展
 	super *HttpContext
 
-	lvServer        *LeafveinServer
-	reqBody         []byte
-	session         LVSession.HttpSession
-	routerKeys      []string  // router keys
-	funcNames       []string  // request controller method names
-	contentEncoding string    // 压缩类型存储
-	comperssWriter  io.Writer //
-	isCloseWriter   bool      // is cell closeWriter()
+	lvServer        *LeafveinServer       //
+	reqBody         []byte                //
+	session         LVSession.HttpSession //
+	routerKeys      []string              // router keys
+	funcNames       []string              // request controller method names
+	contentEncoding string                // 压缩类型存储
+	comperssWriter  io.Writer             //
+	isCloseWriter   bool                  // is cell closeWriter()
+
+	formparams *parampack //	form params
 
 	RespWrite http.ResponseWriter
 	Request   *http.Request
@@ -91,7 +94,7 @@ func (ctx *HttpContext) closeWriter() {
 		ow.Close()
 	case http.ResponseWriter:
 	default:
-		ctx.server.log.Debug("出现未知的压缩数据类型：(%T) 可能没有进行释放.", ow)
+		ctx.lvServer.log.Debug("出现未知的压缩数据类型：(%T) 可能没有进行释放.", ow)
 	}
 }
 
@@ -111,8 +114,13 @@ func (ctx *HttpContext) free() {
 	ctx.Request = nil
 }
 
-//	get session, context the only session
-//	@resetToken is reset session token
+/**
+ *	get session, context the only session
+ *
+ *	@param resetToken is reset session token
+ *	@return HttpSession
+ *	@return error
+ */
 func (ctx *HttpContext) Session(resetToken bool) (LVSession.HttpSession, error) {
 
 	sessionManager := ctx.lvServer.HttpSessionManager()
@@ -124,15 +132,19 @@ func (ctx *HttpContext) Session(resetToken bool) (LVSession.HttpSession, error) 
 		var sessError error
 		ctx.session, sessError = sessionManager.GetSession(ctx.RespWrite, ctx.Request, ctx.lvServer.SessionMaxlifeTime(), resetToken)
 		if nil != sessError {
-			lvLog.Error("get session error:%v", sessError)
+			ctx.lvServer.log.Error("get session error:%v", sessError)
 			return nil, sessError
 		}
 	}
 	return ctx.session, nil
 }
 
-//	get string form token
-//	Note: each access will change
+/**
+ *	get string form token
+ *	Note: each access will change
+ *
+ *	@return
+ */
 func (ctx *HttpContext) FormTokenString() string {
 	session, err := ctx.Session(false)
 	if nil == session || nil != err {
@@ -141,8 +153,12 @@ func (ctx *HttpContext) FormTokenString() string {
 	return session.FormTokenSignature()
 }
 
-//	get html input form token
-//	Note: each access will change
+/**
+ *	get html input form token
+ *	Note: each access will change
+ *
+ *	@return
+ */
 func (ctx *HttpContext) FormTokenHTML() string {
 	session, err := ctx.Session(false)
 	if nil == session || nil != err {
@@ -151,8 +167,12 @@ func (ctx *HttpContext) FormTokenHTML() string {
 	return `<input type="hidden" name="` + HTML_FORM_TOKEN_NAME + `" value="` + session.FormTokenSignature() + `"/>`
 }
 
-//	get javascript the out form token, (主要防止页面抓取)
-//	Note: each access will change
+/**
+ *	get javascript the out form token, (主要防止页面抓取)
+ *	Note: each access will change
+ *
+ *	@return
+ */
 func (ctx *HttpContext) FormTokenJavascript() string {
 	session, err := ctx.Session(false)
 	if nil == session || nil != err {
@@ -189,7 +209,11 @@ func (ctx *HttpContext) FormTokenJavascript() string {
 	return ""
 }
 
-//	check form token
+/**
+ *	check form token
+ *
+ *	@return true is pass
+ */
 func (ctx *HttpContext) CheckFormToken() bool {
 
 	formVals := ctx.Request.Form
@@ -211,7 +235,11 @@ func (ctx *HttpContext) CheckFormToken() bool {
 
 }
 
-// custom check form token
+/**
+ *	custom check form token
+ *
+ *	@param true is pass
+ */
 func (ctx *HttpContext) CheckFormTokenByString(token string) bool {
 	if 0 == len(token) {
 		return false
@@ -225,14 +253,18 @@ func (ctx *HttpContext) CheckFormTokenByString(token string) bool {
 	return session.CheckFormTokenSignature(token)
 }
 
-//	get request body content
+/**
+ *	get request body content
+ *
+ *	@return
+ */
 func (ctx *HttpContext) RequestBody() []byte {
 	if nil == ctx.reqBody {
 		readBody, err := ioutil.ReadAll(ctx.Request.Body)
 		ctx.Request.Body.Close()
 
 		if nil != err {
-			lvLog.Error("request body get error:%v", err)
+			ctx.lvServer.log.Error("request body get error:%v", err)
 			return nil
 		}
 
@@ -249,46 +281,76 @@ func (ctx *HttpContext) RequestBody() []byte {
 	return ctx.reqBody
 }
 
-// requset router keys
+/**
+ *	requset router keys
+ *
+ *	@return
+ */
 func (ctx *HttpContext) RouterKeys() []string {
 	return ctx.routerKeys
 }
 
-// request controller methods
+/**
+ *	request controller methods
+ */
 func (ctx *HttpContext) FuncNames() []string {
 	return ctx.funcNames
 }
 
-//	response comperss write
-// 会根据Accept-Encoding支持的格式进行压缩，优先gzip
+/**
+ *	response comperss write
+ *	会根据Accept-Encoding支持的格式进行压缩，优先gzip
+ */
 func (ctx *HttpContext) RespBodyWrite(body []byte, code HttpStatus) {
 	ctx.RespWrite.Header().Set("Content-Encoding", ctx.contentEncoding)
 	ctx.RespWrite.WriteHeader(int(code))
 	ctx.comperssWriter.Write(body)
 }
 
-//  response not comperss write Content-Encoding = none
+/**
+ *	response not comperss write Content-Encoding = none
+ *
+ *	@param body
+ *	@param code
+ */
 func (ctx *HttpContext) RespBodyWriteNotComperss(body []byte, code HttpStatus) {
 	ctx.RespWrite.Header().Set("Content-Encoding", "none")
 	ctx.RespWrite.WriteHeader(int(code))
 	ctx.RespWrite.Write(body)
 }
 
-//	get comperss writer
+/**
+ *	get comperss writer
+ *
+ *	@return
+ */
 func (ctx *HttpContext) ComperssWriter() io.Writer {
 	ctx.RespWrite.Header().Set("Content-Encoding", ctx.contentEncoding)
 	return ctx.comperssWriter
 }
 
-//	status page write
-//	指定模版的几个参数值，在模板中信息信息的输出
-//	模版的默认map key: {{.msg}} {{.status}} {{.error}} {{.stack}}
+/**
+ *	status page write
+ *	指定模版的几个参数值，在模板中信息信息的输出
+ *	模版的默认map key: {{.msg}} {{.status}} {{.error}} {{.stack}}
+ *
+ *	@param status status code
+ *	@param msg
+ *	@param error
+ *	@param stack
+ *	@return
+ */
 func (ctx *HttpContext) StatusPageWrite(status HttpStatus, msg, error, stack string) error {
 	return ctx.StatusPageWriteByValue(NewHttpStatusValue(status, msg, error, stack))
 }
 
-//	status page write
-//	可以自定义指定模版的参数
+/**
+ *	status page write
+ *	可以自定义指定模版的参数
+ *
+ *	@param value
+ *	@return
+ */
 func (ctx *HttpContext) StatusPageWriteByValue(value HttpStatusValue) error {
 	server := ctx.lvServer
 
@@ -299,8 +361,94 @@ func (ctx *HttpContext) StatusPageWriteByValue(value HttpStatusValue) error {
 	err := server.statusPageExecute(value, ioWr)
 
 	if nil != err {
-		lvLog.Error(err.Error())
+		ctx.lvServer.log.Error(err.Error())
 		return err
 	}
 	return nil
+}
+
+/**
+ *	pack stauct form params
+ *
+ *	@param nilStruct (*TestStruct)(nil)
+ *	@return new pointer struct by Type
+ */
+func (ctx *HttpContext) PackStructForm(nilStruct interface{}) (ptrStruct interface{}, err error) {
+	refVal, e := ctx.PackStructFormByRefType(reflect.TypeOf(nilStruct))
+
+	if nil == e {
+		ptrStruct = refVal.Interface()
+	} else {
+		err = e
+	}
+
+	return
+}
+
+/**
+ *	pack stauct form params by reflect type
+ *
+ *	@param structType
+ *	@return  reflect.Value
+ */
+func (ctx *HttpContext) PackStructFormByRefType(structType reflect.Type) (refVal reflect.Value, err error) {
+
+	if nil == ctx.formparams {
+		ctx.formparams, err = parampackParseForm(ctx.Request, ctx.lvServer.FileUploadSize())
+		if nil != err {
+
+			pfpErr := *ErrParampackParseFormParams
+			pfpErr.UserInfo = "error info: " + err.Error()
+			ctx.lvServer.log.Debug(pfpErr.Error())
+			err = &pfpErr
+		}
+	}
+
+	if nil == ctx.formparams {
+		if nil == err {
+			err = ErrParampackParseFormParams
+		}
+		return
+	}
+
+	//	new struct
+	isNewStruct := false
+	switch structType.Kind() {
+	case reflect.Ptr:
+		switch structType.Elem().Kind() {
+		case reflect.Struct:
+			refVal = parampackNewStructPtr(structType.Elem(), ctx.formparams.params)
+			isNewStruct = true
+		}
+	case reflect.Struct:
+		refVal = parampackNewStructPtr(structType, ctx.formparams.params)
+		isNewStruct = true
+	}
+
+	//	set stauct field value
+	if isNewStruct {
+		for k, v := range ctx.formparams.params {
+			count := len(v)
+			switch {
+			case 1 == count:
+				parampackSetStructFieldValue(refVal, k, v[0])
+			case 1 < count:
+				parampackSetStructFieldValue(refVal, k, v)
+			}
+
+		}
+		for fk, fv := range ctx.formparams.files {
+			count := len(fv)
+			switch {
+			case 1 == count:
+				parampackSetStructFieldValue(refVal, fk, fv[0])
+			case 1 < count:
+				parampackSetStructFieldValue(refVal, fk, fv)
+			}
+		}
+	} else {
+		err = ErrParampackNewStruct
+	}
+
+	return
 }

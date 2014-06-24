@@ -23,7 +23,6 @@ package leafveingo
 
 import (
 	"bytes"
-	"errors"
 	"flag"
 	"fmt"
 	"github.com/slowfei/gosfcore/helper"
@@ -37,10 +36,9 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
-	"reflect"
-	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -127,7 +125,7 @@ func Version() string {
  */
 func addServerList(server *LeafveinServer) {
 	if nil != GetServer(server.AppName()) {
-		panic(ErrLeafveingoAppNameRepeat)
+		panic(ErrLeafveinAppNameRepeat)
 	}
 	_serverList = append(_serverList, server)
 }
@@ -295,13 +293,15 @@ func NewLeafveinServer(appName string, option ServerOption) *LeafveinServer {
  */
 func (lv *LeafveinServer) initPrivate(option ServerOption) {
 
-	server.configLoadDefault()
+	lv.configLoadDefault()
 
 	//	config handle
 	if 0 != len(option.configPath) {
 		config, err := configLoadByFilepath(option.configPath)
 		if nil != err {
-			panic("error init load config: %v", NewLeafveingoError(err.Error()))
+			lilcErr := *ErrLeafveinInitLoadConfig
+			lilcErr.UserInfo = err.Error()
+			panic(&lilcErr)
 			return
 		}
 		lv.configReload(config)
@@ -339,9 +339,11 @@ func (lv *LeafveinServer) free() {
  *	load default config info
  */
 func (lv *LeafveinServer) configLoadDefault() {
-	config, err := configLoadByJson(_defaultConfigJson)
+	config, err := configLoadByJson([]byte(_defaultConfigJson))
 	if nil != err {
-		panic("error load default config: %v", NewLeafveingoError(err.Error()))
+		lldcErr := *ErrLeafveinLoadDefaultConfig
+		lldcErr.UserInfo = err.Error()
+		panic(&lldcErr)
 		return
 	}
 	lv.configReload(config)
@@ -352,12 +354,12 @@ func (lv *LeafveinServer) configLoadDefault() {
  *
  *	@param cf
  */
-func (lv *LeafveinServer) configReload(cf Config) {
+func (lv *LeafveinServer) configReload(cf *Config) {
 
 	lv.SetAppVersion(cf.AppVersion)
 	lv.SetFileUploadSize(cf.FileUploadSize)
 	lv.SetCharset(cf.Charset)
-	lv.SetStaticFileSuffixes(cf.StaticFileSuffixes)
+	lv.SetStaticFileSuffixes(cf.StaticFileSuffixes...)
 	lv.SetSessionMaxlifeTime(cf.SessionMaxlifeTime)
 	lv.SetReqPathIgnoreCase(cf.IsReqPathIgnoreCase)
 	lv.SetTemplateSuffix(cf.TemplateSuffix)
@@ -412,11 +414,12 @@ func (lv *LeafveinServer) statusPageExecute(value HttpStatusValue, wr io.Writer)
 
 /**
  *	parse router
- *	TODO
  *
+ *	@param logInfo
+ *	@param startName
  *	@return success == true
  */
-func (lv *LeafveinServer) parseRouter(logInfo *string) bool {
+func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 
 	//	memory storage
 	lv.memTemplateDir = filepath.Join(lv.operatingDir, DEFAULT_TEMPLATE_DIR_NAME)
@@ -450,7 +453,7 @@ func (lv *LeafveinServer) parseRouter(logInfo *string) bool {
 	}
 
 	if isExites, isDir, _ := SFFileManager.Exists(lv.WebRootDir()); !isExites || !isDir {
-		lv.log.Warn("not locate the %v directory, will not be able to read a static file resource and upload file. \n  need to create directory: %v \n", lv.webRootDir, lv.WebRootDir())
+		lv.log.Warn("not locate the %v directory, will not be able to read a static file resource and upload file. \n  need to create directory: %v \n", lv.WebRootDir(), lv.WebRootDir())
 	}
 
 	//	print log info
@@ -472,7 +475,7 @@ func (lv *LeafveinServer) start(startName string) {
 	//	start info
 	logInfo := fmt.Sprintf("Leafvein %v...\n", startName)
 
-	if !lv.parseRouter(&logInfo) {
+	if !lv.parseRouter(&logInfo, startName) {
 		return
 	}
 
@@ -522,7 +525,7 @@ func (lv *LeafveinServer) start(startName string) {
  *
  *	@param context
  */
-func (lv *LeafveinServer) deferServeHTTP(context *HttpContext) {
+func (lv *LeafveinServer) deferServeHTTP(context *HttpContext, rw http.ResponseWriter) {
 
 	if err := recover(); err != nil {
 		errStr := fmt.Sprintln(err)
@@ -560,7 +563,7 @@ func (lv *LeafveinServer) deferServeHTTP(context *HttpContext) {
 			}
 		}
 
-		fmt.Fprintf(stackBuf, "\n-----------------------------\nleafveiongo version:%v \ngolang version: %v", lv.Version(), runtime.Version())
+		fmt.Fprintf(stackBuf, "\n-----------------------------\nleafveiongo version:%v \ngolang version: %v", Version(), runtime.Version())
 		lv.log.Error(stackBuf.String())
 	}
 
@@ -602,13 +605,13 @@ func (lv *LeafveinServer) Start() {
 func (lv *LeafveinServer) GetHandlerFunc(prefix string) (handler http.Handler, err error) {
 
 	if 2 > len(prefix) || prefix[0] != '/' {
-		err = NewLeafveingoError("GetHandlerFunc(...) prefix error : %#v  reference ( \"/expand\" )", prefix)
+		err = NewLeafveinError("GetHandlerFunc(...) prefix error : %#v  reference ( \"/expand\" )", prefix)
 		return
 	}
 
 	logInfo := fmt.Sprintf("GetHandlerFunc() parse router...\n")
 
-	if !lv.parseRouter(&logInfo) {
+	if !lv.parseRouter(&logInfo, "HandlerFunc") {
 		return
 	}
 
@@ -665,7 +668,7 @@ func (lv *LeafveinServer) AddRouter(router IRouter) {
 	//	验证添加路由path的规则
 	//	字符串不等于nil || 查询不到"/" || "/" 不在首位
 	if len(routerKey) == 0 || routerKey[0] != '/' {
-		panic(NewLeafveingoError("AddRouter routerKey error : %#v(%s)  reference ( \"/\" | \"/Admin/\" )", routerKey, router.Info()))
+		panic(NewLeafveinError("AddRouter routerKey error : %#v(%s)  reference ( \"/\" | \"/Admin/\" )", routerKey, router.Info()))
 	}
 
 	if nil == router {
@@ -927,7 +930,7 @@ func (lv *LeafveinServer) SetStaticFileSuffixes(suffixes ...string) {
 
 	lv.staticFileSuffixes = make(map[string]string)
 
-	for i, v := range suffixes {
+	for _, v := range suffixes {
 		if 0 != len(v) {
 			key := v
 			if key[0] != '.' {
@@ -1063,14 +1066,14 @@ func (lv *LeafveinServer) IsCompactHTML() bool {
  *	@param path
  */
 func (lv *LeafveinServer) SetLogConfigPath(path string) {
-	lv.logConfPath = path
+	lv.logConfigPath = path
 }
 
 /**
  *	get log config path
  */
 func (lv *LeafveinServer) LogConfPath() string {
-	return lv.logConfPath
+	return lv.logConfigPath
 }
 
 /**
@@ -1104,7 +1107,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	var context *HttpContext = nil
 	reqPath := req.URL.Path
 
-	defer lv.deferServeHTTP(context)
+	defer lv.deferServeHTTP(context, rw)
 
 	//	前缀url清除，call GetHandlerFunc() 才会使用到此操作
 	//	/expand/index = /index
@@ -1153,26 +1156,13 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	lv.log.Info("request url path: [%s,%s,%d]%#v", option.requestMethod, option.routerKey, statusCode, reqPath)
 
+	errstr := ""
+	var err error = nil
+
 	if Status200 == statusCode && nil != router {
-		//	parse controller
 
-		errstr := ""
-		var err error = nil
-		funcName := ""
-		tplPath := ""
-
-		funcName, tplPath, statusCode, err = router.ParseController(context, option)
-
-		logInfo := "controller info : " + router.Info() + "\n"
-		logInfo += "func name: [" + funcName + "]" + "\n"
-		logInfo += "template path: " + tplPath + "\n"
-		logInfo += "status sode: " + StatusCodeToString(statusCode) + "\n"
-		lv.log.Info(logInfo)
-
-		if Status200 == statusCode && nil == err {
-			// call controller func and return value handle
-			statusCode, err = controllerCallHandle(context, option.routerKey, funcName, tplPath)
-		}
+		// call controller func and return value handle
+		statusCode, err = controllerCallHandle(context, router, option, false, "")
 
 		if nil != err {
 			if Status200 == statusCode {
@@ -1204,7 +1194,8 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 
 	} else {
-		context.StatusPageWrite(statusCode, StatusMsg(statusCode), "", "")
+		context.StatusPageWrite(statusCode, StatusMsg(statusCode), errstr, "")
 	}
 
+	lv.log.Info("status code: (" + StatusCodeToString(statusCode) + ")" + errstr)
 }
