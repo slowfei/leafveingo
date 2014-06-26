@@ -31,6 +31,8 @@ var (
 	_globalRouterList []globalRouter = nil
 )
 
+//#pragma mark global handle ----------------------------------------------------------------------------------------------------
+
 //
 //	global router
 //
@@ -50,6 +52,8 @@ func AddRouter(appName string, router IRouter) {
 	_globalRouterList = append(_globalRouterList, globalRouter{appName, router})
 }
 
+//#pragma mark interface option ----------------------------------------------------------------------------------------------------
+
 //
 //	router option
 //
@@ -60,19 +64,36 @@ type RouterOption struct {
 		routerPath 		= "index"
 		requestMethod	= "get"
 		urlSuffix       = ".go"
+
+		GET http://localhost:8080/home/manager/help.go
+		routerKey 		= "/home/"
+		routerPath 		= "manager/help"
+		requestMethod	= "get"
+		urlSuffix       = ".go"
+
+		GET http://localhost:8080/home/manager/other
+		routerKey 		= "/home/"
+		routerPath 		= "manager/other"
+		requestMethod	= "get"
+		urlSuffix       = ""
+
+		GET http://localhost:8080/home#!other
+		routerKey 		= "/home"
+		routerPath 		= "#!other"
+		requestMethod	= "get"
+		urlSuffix       = ""
 	*/
 
-	routerKey     string //
-	routerPath    string //	have been converted to lowercase
-	requestMethod string //	GET POST ...
-	urlSuffix     string //
+	RouterKey     string //
+	RouterPath    string //	have been converted to lowercase
+	RequestMethod string //	lowercase get post ...
+	UrlSuffix     string //
 
-	appName string // application name
+	AppName string // application name
 }
 
 //
-//	router
-//	TODO
+//	router interface
 //
 type IRouter interface {
 
@@ -137,6 +158,8 @@ type IRouter interface {
 	Info() string
 }
 
+//#pragma mark Leafveingo method ----------------------------------------------------------------------------------------------------
+
 /**
  *	router parse
  *
@@ -165,11 +188,14 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 		if keyLen <= reqPathLen && key == lowerReqPath[:keyLen] {
 
 			if r, ok := context.lvServer.routers[key]; ok {
-				option.appName = context.lvServer.AppName()
-				option.urlSuffix = reqSuffix
-				option.requestMethod = context.Request.Method //SFStringsUtil.ToLower(context.Request.Method)
-				option.routerKey = key
-				option.routerPath = lowerReqPath[keyLen:]
+				option.AppName = context.lvServer.AppName()
+				option.UrlSuffix = reqSuffix
+				option.RequestMethod = SFStringsUtil.ToLower(context.Request.Method)
+				if 0 == len(option.RequestMethod) {
+					option.RequestMethod = "get"
+				}
+				option.RouterKey = key
+				option.RouterPath = lowerReqPath[keyLen:]
 				statusCode = Status200
 				router = r
 			} else {
@@ -182,5 +208,4 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 	}
 
 	return
-
 }

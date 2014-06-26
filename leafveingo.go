@@ -48,14 +48,6 @@ const (
 	//	leafveingo version
 	VERSION string = "0.0.2.000"
 
-	//	controller default url request ("http://localhost:8080/") method
-	CONTROLLER_DEFAULT_METHOD = "Index"
-	//	请求访问到控制器前进行调用的函数名称
-	//	Requesting access to the controller before calling the function name
-	CONTROLLER_BEFORE_METHOD = "Before"
-	//	After the calling the function name
-	CONTROLLER_AFTER_METHOD = "After"
-
 	// template func key
 	TEMPLATE_FUNC_KEY_VERSION     = "Leafveingo_version"
 	TEMPLATE_FUNC_KEY_APP_VERSION = "Leafveingo_app_version"
@@ -1154,7 +1146,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//	router parse
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)
 
-	lv.log.Info("request url path: [%s,%s,%d]%#v", option.requestMethod, option.routerKey, statusCode, reqPath)
+	lv.log.Info("request url path: [%s,%s,%d]%#v", option.RequestMethod, option.RouterKey, statusCode, reqPath)
 
 	errstr := ""
 	var err error = nil
