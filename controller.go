@@ -27,6 +27,13 @@ import (
 	"github.com/slowfei/leafveingo/template"
 	"net/http"
 	"path"
+	"reflect"
+)
+
+var (
+	// controller reflect type
+	RefTypeBeforeAfterController = reflect.TypeOf((*BeforeAfterController)(nil)).Elem()
+	RefTypeAdeRouterController   = reflect.TypeOf((*AdeRouterController)(nil)).Elem()
 )
 
 //
@@ -105,7 +112,7 @@ func controllerCallHandle(context *HttpContext, router IRouter, option RouterOpt
 		return
 	}
 
-	context.routerKeys = append(context.routerKeys, option.routerKey)
+	context.routerKeys = append(context.routerKeys, option.RouterKey)
 	context.funcNames = append(context.funcNames, funcName)
 
 	//	before
@@ -214,8 +221,8 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 			}
 
 			//	TODO 这样转发可能存在隐藏性的问题，关键在于option的作用。但目前的代码设计来说还不存在大的问题。
-			option.routerKey = cvt.RouterKey
-			option.routerPath = ""
+			option.RouterKey = cvt.RouterKey
+			option.RouterPath = ""
 			statusCode, err = controllerCallHandle(context, router, option, true, cvt.FuncName)
 
 		} else {
