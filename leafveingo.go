@@ -13,12 +13,14 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2014-06-10
+//  Update on 2014-06-27
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
 
-//	web框架leafveingo
+//
+//	Leafveingo web framework
+//
 package leafveingo
 
 import (
@@ -420,7 +422,12 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 	//	log manager
 	SFLog.LoadConfig(lv.logConfigPath)
 	logTag := fmt.Sprintf("Leafvein(%s)", lv.appName)
-	lv.log = SFLog.NewLogger(logTag)
+
+	if 0 != len(lv.LogGroup()) {
+		lv.log = SFLog.NewLoggerByGroup(logTag, lv.LogGroup())
+	} else {
+		lv.log = SFLog.NewLogger(logTag)
+	}
 
 	//	template
 	lv.template.SetBaseDir(lv.TemplateDir())
@@ -1088,6 +1095,15 @@ func (lv *LeafveinServer) LogGroup() string {
 	return lv.logGroup
 }
 
+/**
+ *	get log object
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) Log() *SFLog.SFLogger {
+	return lv.log
+}
+
 //# mark LeafveinHttp override method -------------------------------------------------------------------------------------------
 
 /**
@@ -1173,20 +1189,19 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		switch statusCode {
 		case Status200, Status301, Status307, StatusNil:
 			//	不作处理的状态
-		case Status400:
-			context.StatusPageWrite(statusCode, Status400Msg, errstr, "")
-		case Status403:
-			context.StatusPageWrite(statusCode, Status403Msg, errstr, "")
-		case Status500:
-			context.StatusPageWrite(statusCode, Status500Msg, errstr, "")
-		case Status503:
-			context.StatusPageWrite(statusCode, Status503Msg, errstr, "")
 		default:
-			context.StatusPageWrite(statusCode, Status404Msg, errstr, "")
+			if lv.IsDevel() {
+				context.StatusPageWrite(statusCode, StatusMsg(statusCode), errstr, "")
+			} else {
+				context.StatusPageWrite(statusCode, StatusMsg(statusCode), "", "")
+			}
 		}
-
 	} else {
-		context.StatusPageWrite(statusCode, StatusMsg(statusCode), errstr, "")
+		if lv.IsDevel() {
+			context.StatusPageWrite(statusCode, StatusMsg(statusCode), errstr, "")
+		} else {
+			context.StatusPageWrite(statusCode, StatusMsg(statusCode), "", "")
+		}
 	}
 
 	lv.log.Info("status code: (" + StatusCodeToString(statusCode) + ")" + errstr)

@@ -67,7 +67,7 @@ var (
 		"IsCompactHTML"			:true,
 
 		"LogConfigPath"		:"config/log.conf",
-		"LogGroup" 			:"leafveingo",
+		"LogGroup" 			:"",
 
 		"IsRespWriteCompress"	:true,
 		
