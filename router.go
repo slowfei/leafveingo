@@ -63,13 +63,13 @@ type RouterOption struct {
 		routerKey 		= "/home/"
 		routerPath 		= "index"
 		requestMethod	= "get"
-		urlSuffix       = ".go"
+		urlSuffix       = "go"
 
 		GET http://localhost:8080/home/manager/help.go
 		routerKey 		= "/home/"
 		routerPath 		= "manager/help"
 		requestMethod	= "get"
-		urlSuffix       = ".go"
+		urlSuffix       = "go"
 
 		GET http://localhost:8080/home/manager/other
 		routerKey 		= "/home/"
@@ -87,7 +87,7 @@ type RouterOption struct {
 	RouterKey     string //
 	RouterPath    string //	have been converted to lowercase
 	RequestMethod string //	lowercase get post ...
-	UrlSuffix     string //
+	UrlSuffix     string // lowercase
 
 	AppName string // application name
 }
@@ -117,8 +117,8 @@ type IRouter interface {
 	 *	no need to add the suffix
 	 *
 	 *	@param context
-	 *	@param funcName	controller call func name
-	 *	@param option	router option
+	 *	@param funcName	 controller call func name
+	 *	@param option	 router option
 	 *	@return template path, suggest "[routerKey]/[funcName]"
 	 */
 	ParseTemplatePath(context *HttpContext, funcName string, option RouterOption) string
@@ -128,10 +128,11 @@ type IRouter interface {
 	 *
 	 *	@param context			http content
 	 *	@param funcName			call controller func name
+	 *	@param option			router option
 	 *	@return returnValue		controller func return value
 	 *	@return statusCode		http status code, 200 pass, other to status page
 	 */
-	CallFunc(context *HttpContext, funcName string) (returnValue interface{}, statusCode HttpStatus, err error)
+	CallFunc(context *HttpContext, funcName string, option RouterOption) (returnValue interface{}, statusCode HttpStatus, err error)
 
 	/**
 	 *	before call func
@@ -189,11 +190,19 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 
 			if r, ok := context.lvServer.routers[key]; ok {
 				option.AppName = context.lvServer.AppName()
-				option.UrlSuffix = reqSuffix
+
+				if 0 != len(reqSuffix) {
+					if '.' == reqSuffix[0] {
+						reqSuffix = reqSuffix[1:]
+					}
+					option.UrlSuffix = SFStringsUtil.ToLower(reqSuffix)
+				}
+
 				option.RequestMethod = SFStringsUtil.ToLower(context.Request.Method)
 				if 0 == len(option.RequestMethod) {
 					option.RequestMethod = "get"
 				}
+
 				option.RouterKey = key
 				option.RouterPath = lowerReqPath[keyLen:]
 				statusCode = Status200

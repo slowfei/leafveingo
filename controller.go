@@ -119,7 +119,7 @@ func controllerCallHandle(context *HttpContext, router IRouter, option RouterOpt
 	statusCode = router.CallFuncBefore(context, option)
 	if Status200 == statusCode {
 		//	exce call
-		returnValue, statusCode, err = router.CallFunc(context, funcName)
+		returnValue, statusCode, err = router.CallFunc(context, funcName, option)
 
 		if Status200 == statusCode && nil == err {
 			if nil != returnValue {
