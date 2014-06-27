@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-24
-//  Update on 2014-06-20
+//  Update on 2014-06-27
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -89,14 +89,7 @@ func BodyByte(content []byte, contentType string, headers map[string]string) Byt
 /**
  *	by template out html, text/html
  *
- *	template path: (templateDir)/(controllerRouter)/(methodName).tpl
- * 	e.g.:    URL = http://localhost:8080/index
- *	  router key = "/", funcName "Index"
- *	templatePath = (templateDir)/index.tpl
- *
- *			 URL = http://localhost:8080/Admin/index
- *	  router key = "/admin/", funcName "Index"
- *	templatePath = (templateDir)/admin/index.tpl
+ *	default template path by IRouter interface implementation definition
  *
  *	@param data
  *	@return TemplateValue
