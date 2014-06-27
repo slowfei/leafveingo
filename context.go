@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-13
-//  Update on 2014-06-24
+//  Update on 2014-06-27
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -112,6 +112,15 @@ func (ctx *HttpContext) free() {
 	ctx.comperssWriter = nil
 	ctx.RespWrite = nil
 	ctx.Request = nil
+}
+
+/**
+ *	get current leafvein server
+ *
+ *	@return *LeafveinServer
+ */
+func (ctx *HttpContext) LVServer() *LeafveinServer {
+	return ctx.lvServer
 }
 
 /**
@@ -389,7 +398,8 @@ func (ctx *HttpContext) PackStructForm(nilStruct interface{}) (ptrStruct interfa
  *	pack stauct form params by reflect type
  *
  *	@param structType
- *	@return  reflect.Value
+ *	@return refVal
+ *	@return err
  */
 func (ctx *HttpContext) PackStructFormByRefType(structType reflect.Type) (refVal reflect.Value, err error) {
 
