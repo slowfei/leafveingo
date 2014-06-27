@@ -257,6 +257,7 @@ func (l *lvtemplate) Execute(wr io.Writer, value TemplateValue) error {
 func (l *lvtemplate) TemplatePathAtName(tplName string) string {
 	var fullPath string
 
+	//	TODO 待整改Join，自己拼接还快几倍
 	if 0 < len(l.baseDir) {
 		fullPath = path.Join(l.baseDir, tplName)
 	} else {
