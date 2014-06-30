@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2014-06-16
-//  Update on 2014-06-16
+//  Update on 2014-06-30
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -88,6 +88,14 @@ func (o *ReflectRouterOption) checked() {
 //			   URL = POST http://localhost:8080/
 //		 func name = PostIndex
 //
+//		router key = "/"
+//			   URL = Get http://localhost:8080/user#!list
+//		 func name = UserList
+//
+//		router key = "/"
+//			   URL = Post http://localhost:8080/user[^a-zA-Z]+list[^a-zA-Z]+auto
+//		 func name = PostUserListAuto
+//
 //		router key = "/admin/"
 //			   URL = GET http://localhost:8080/admin/login
 //		 func name = Login
@@ -101,7 +109,7 @@ func (o *ReflectRouterOption) checked() {
 //		CreateReflectController("/home/", HomeController{})
 //		每次请求(http://localhost:8080/home/)时 controller 都会根据设置的控制器类型新建立一个对象进行处理
 //
-//		地址传递：
+//		指针传递：
 //		CreateReflectController("/admin/", &AdminController{})
 //		跟值传递相反，每次请求时都会使用设置的控制器地址进行处理，应用结束也不会改变，每次请求控制器都不会改变内存地址
 //		这里涉及到并发时同时使用一个内存地址处理的问题，不过目前还没有弄到锁，并发后期会进行改进和处理。
@@ -136,7 +144,9 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
 	strBeforeAfter := ""
 	strAde := ""
 
-	refRouter := &ReflectRouter{routerKey: routerKey, checkFuncName: make(map[string]int)}
+	refRouter := new(ReflectRouter)
+	refRouter.routerKey = routerKey
+	refRouter.checkFuncName = make(map[string]int)
 	refRouter.ctlRefVal = reflect.ValueOf(controller)
 
 	if refRouter.ctlRefVal.Type().Implements(RefTypeBeforeAfterController) {
@@ -170,7 +180,7 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
  *	@param funcName
  *	@param option
  */
-func (r *ReflectRouter) funcNameSuffixHandle(funcName string, option RouterOption) string {
+func (r *ReflectRouter) funcNameSuffixHandle(funcName string, option *RouterOption) string {
 	result := funcName
 
 	urlSuffix := option.UrlSuffix
@@ -258,16 +268,28 @@ func (r *ReflectRouter) getFuncArgs(funcType reflect.Type, context *HttpContext)
 
 //# mark ReflectRouter override IRouter -------------------------------------------------------------------------------------------
 
-func (r *ReflectRouter) RouterKey() string {
-	return r.routerKey
+func (r *ReflectRouter) AfterRouterParse(context *HttpContext, option *RouterOption) HttpStatus {
+	statusCode := Status200
+
+	if reflect.Ptr != r.ctlRefVal.Kind() {
+		option.RouterDataRefVal = reflect.New(r.ctlRefVal.Type())
+	}
+
+	return statusCode
 }
 
-func (r *ReflectRouter) ParseFuncName(context *HttpContext, option RouterOption) (funcName string, statusCode HttpStatus, err error) {
+func (r *ReflectRouter) ParseFuncName(context *HttpContext, option *RouterOption) (funcName string, statusCode HttpStatus, err error) {
 
 	/* 高级路由实现操作 */
 	if nil != r.implAdeRouter {
 		var params map[string]string = nil
-		funcName, params = r.implAdeRouter.RouterMethodParse(option)
+
+		if reflect.Invalid != option.RouterDataRefVal.Kind() {
+			adeRouter := option.RouterDataRefVal.Interface().(AdeRouterController)
+			funcName, params = adeRouter.RouterMethodParse(option)
+		} else {
+			funcName, params = r.implAdeRouter.RouterMethodParse(option)
+		}
 
 		if 0 == len(funcName) {
 			statusCode = Status404
@@ -351,7 +373,55 @@ func (r *ReflectRouter) ParseFuncName(context *HttpContext, option RouterOption)
 	return
 }
 
-func (r *ReflectRouter) ParseTemplatePath(context *HttpContext, funcName string, option RouterOption) string {
+func (r *ReflectRouter) CallFuncBefore(context *HttpContext, option *RouterOption) HttpStatus {
+	statucCode := Status200
+
+	if nil != r.implBeforeAfter {
+		if reflect.Invalid != option.RouterDataRefVal.Kind() {
+			beforeAfter := option.RouterDataRefVal.Interface().(BeforeAfterController)
+			statucCode = beforeAfter.Before(context, option)
+		} else {
+			statucCode = r.implBeforeAfter.Before(context, option)
+		}
+	}
+
+	return statucCode
+}
+
+func (r *ReflectRouter) CallFunc(context *HttpContext, funcName string, option *RouterOption) (returnValue interface{}, statusCode HttpStatus, err error) {
+
+	if index, ok := r.checkFuncName[funcName]; ok {
+		statusCode = Status200
+
+		var controller reflect.Value
+
+		if reflect.Invalid != option.RouterDataRefVal.Kind() {
+			controller = option.RouterDataRefVal
+		} else {
+			controller = r.ctlRefVal
+		}
+
+		refMet := controller.Method(index)
+
+		//	get params
+		args := r.getFuncArgs(refMet.Type(), context)
+
+		//	call method
+		reVals := refMet.Call(args)
+
+		if 0 != len(reVals) {
+			returnValue = reVals[0].Interface()
+		}
+
+	} else {
+		statusCode = Status404
+		err = NewLeafveinError("(" + r.typestr + ") not found func name: " + funcName)
+	}
+
+	return
+}
+
+func (r *ReflectRouter) ParseTemplatePath(context *HttpContext, funcName string, option *RouterOption) string {
 
 	if 0 == len(funcName) {
 		return ""
@@ -380,45 +450,19 @@ func (r *ReflectRouter) ParseTemplatePath(context *HttpContext, funcName string,
 	return path + "/" + name + context.LVServer().TemplateSuffix()
 }
 
-func (r *ReflectRouter) CallFunc(context *HttpContext, funcName string, option RouterOption) (returnValue interface{}, statusCode HttpStatus, err error) {
-
-	if index, ok := r.checkFuncName[funcName]; ok {
-		statusCode = Status200
-
-		refMet := r.ctlRefVal.Method(index)
-
-		//	get params
-		args := r.getFuncArgs(refMet.Type(), context)
-
-		//	call method
-		reVals := refMet.Call(args)
-
-		if 0 != len(reVals) {
-			returnValue = reVals[0].Interface()
+func (r *ReflectRouter) CallFuncAfter(context *HttpContext, option *RouterOption) {
+	if nil != r.implBeforeAfter {
+		if reflect.Invalid == option.RouterDataRefVal.Kind() {
+			beforeAfter := option.RouterDataRefVal.Interface().(BeforeAfterController)
+			beforeAfter.After(context, option)
+		} else {
+			r.implBeforeAfter.After(context, option)
 		}
-
-	} else {
-		statusCode = Status404
-		err = NewLeafveinError("(" + r.typestr + ") not found func name: " + funcName)
 	}
-
-	return
 }
 
-func (r *ReflectRouter) CallFuncBefore(context *HttpContext, option RouterOption) HttpStatus {
-	statucCode := Status200
-
-	if nil != r.implBeforeAfter {
-		statucCode = r.implBeforeAfter.Before(context, option)
-	}
-
-	return statucCode
-}
-
-func (r *ReflectRouter) CallFuncAfter(context *HttpContext, option RouterOption) {
-	if nil != r.implBeforeAfter {
-		r.implBeforeAfter.After(context, option)
-	}
+func (r *ReflectRouter) RouterKey() string {
+	return r.routerKey
 }
 
 func (r *ReflectRouter) Info() string {
