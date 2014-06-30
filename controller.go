@@ -13,11 +13,12 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-16
-//  Update on 2014-06-23
+//  Update on 2014-06-30
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
-//	leafveingo web 的控制器操作
+//
+//	controller handle
 //
 package leafveingo
 
@@ -49,7 +50,7 @@ type BeforeAfterController interface {
 	 *	@return Status200 pass, StatusNil stop Next to proceed, other status jump relevant status page
 	 *
 	 */
-	Before(context *HttpContext, option RouterOption) HttpStatus
+	Before(context *HttpContext, option *RouterOption) HttpStatus
 
 	/**
 	 *	after the call controller func
@@ -57,7 +58,7 @@ type BeforeAfterController interface {
 	 * 	@param context
 	 *	@param option
 	 */
-	After(context *HttpContext, option RouterOption)
+	After(context *HttpContext, option *RouterOption)
 }
 
 //
@@ -75,7 +76,7 @@ type AdeRouterController interface {
 	 *	@return funcName	is "" jump 404 page, other by name call controller
 	 *	@return params		add to request form param, use set Request.URL.Query()
 	 */
-	RouterMethodParse(option RouterOption) (funcName string, params map[string]string)
+	RouterMethodParse(option *RouterOption) (funcName string, params map[string]string)
 }
 
 /**
@@ -88,7 +89,7 @@ type AdeRouterController interface {
  *	@param isDisp		is Dispatcher
  *	@param dispFunaName no dispatcher to nil
  */
-func controllerCallHandle(context *HttpContext, router IRouter, option RouterOption, isDisp bool, dispFunaName string) (statusCode HttpStatus, err error) {
+func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOption, isDisp bool, dispFunaName string) (statusCode HttpStatus, err error) {
 
 	var funcName string = ""
 	var returnValue interface{} = nil
@@ -117,6 +118,7 @@ func controllerCallHandle(context *HttpContext, router IRouter, option RouterOpt
 
 	//	before
 	statusCode = router.CallFuncBefore(context, option)
+
 	if Status200 == statusCode {
 		//	exce call
 		returnValue, statusCode, err = router.CallFunc(context, funcName, option)
@@ -128,6 +130,7 @@ func controllerCallHandle(context *HttpContext, router IRouter, option RouterOpt
 			}
 		}
 	}
+
 	//	after
 	router.CallFuncAfter(context, option)
 
@@ -141,7 +144,7 @@ func controllerCallHandle(context *HttpContext, router IRouter, option RouterOpt
  *	@param context
  *	@param tplPath template access path, no suffix
  */
-func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, router IRouter, option RouterOption, funcName string) (statusCode HttpStatus, err error) {
+func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, router IRouter, option *RouterOption, funcName string) (statusCode HttpStatus, err error) {
 	statusCode = Status200
 
 	lv := context.lvServer

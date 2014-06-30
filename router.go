@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-14
-//  Update on 2014-06-23
+//  Update on 2014-06-30
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -24,6 +24,7 @@ package leafveingo
 
 import (
 	"github.com/slowfei/gosfcore/utils/strings"
+	"reflect"
 )
 
 var (
@@ -84,9 +85,12 @@ type RouterOption struct {
 		urlSuffix       = ""
 	*/
 
+	RouterData       interface{}   // custom storage data
+	RouterDataRefVal reflect.Value // reflect value data
+
 	RouterKey     string //
-	RouterPath    string //	have been converted to lowercase
-	RequestMethod string //	lowercase get post ...
+	RouterPath    string // have been converted to lowercase
+	RequestMethod string // lowercase get post ...
 	UrlSuffix     string // lowercase
 
 	AppName string // application name
@@ -98,33 +102,35 @@ type RouterOption struct {
 type IRouter interface {
 
 	/**
-	 *	@return router key
+	 *	1. after router parse
+	 *
+	 *	@param context
+	 *	@param option
+	 *	@return HttpStatus  200 pass
 	 */
-	RouterKey() string
+	AfterRouterParse(context *HttpContext, option *RouterOption) HttpStatus
 
 	/**
-	 *	parse func name
+	 *	2. parse func name
 	 *
 	 *	@param context			http context
 	 *	@param option			router option
 	 *	@return funcName 		function name specifies call
 	 *	@return statusCode		http status code, 200 pass, other to status page
 	 */
-	ParseFuncName(context *HttpContext, option RouterOption) (funcName string, statusCode HttpStatus, err error)
+	ParseFuncName(context *HttpContext, option *RouterOption) (funcName string, statusCode HttpStatus, err error)
 
 	/**
-	 *	parse template path
-	 *	no need to add the suffix
+	 *	3. before call func
 	 *
 	 *	@param context
-	 *	@param funcName	 controller call func name
-	 *	@param option	 router option
-	 *	@return template path, suggest "[routerKey]/[funcName]"
+	 *	@param option
+	 *	@return HttpStatus
 	 */
-	ParseTemplatePath(context *HttpContext, funcName string, option RouterOption) string
+	CallFuncBefore(context *HttpContext, option *RouterOption) HttpStatus
 
 	/**
-	 *	request func
+	 *	4. request func
 	 *
 	 *	@param context			http content
 	 *	@param funcName			call controller func name
@@ -132,24 +138,31 @@ type IRouter interface {
 	 *	@return returnValue		controller func return value
 	 *	@return statusCode		http status code, 200 pass, other to status page
 	 */
-	CallFunc(context *HttpContext, funcName string, option RouterOption) (returnValue interface{}, statusCode HttpStatus, err error)
+	CallFunc(context *HttpContext, funcName string, option *RouterOption) (returnValue interface{}, statusCode HttpStatus, err error)
 
 	/**
-	 *	before call func
+	 *	5. parse template path
+	 *	no need to add the suffix
+	 *
+	 *	@param context
+	 *	@param funcName	 controller call func name
+	 *	@param option	 router option
+	 *	@return template path, suggest "[routerKey]/[funcName]"
+	 */
+	ParseTemplatePath(context *HttpContext, funcName string, option *RouterOption) string
+
+	/**
+	 *	6. after call func
 	 *
 	 *	@param context
 	 *	@param option
-	 *	@return HttpStatus
 	 */
-	CallFuncBefore(context *HttpContext, option RouterOption) HttpStatus
+	CallFuncAfter(context *HttpContext, option *RouterOption)
 
 	/**
-	 *	after call func
-	 *
-	 *	@param context
-	 *	@param option
+	 *	@return router key
 	 */
-	CallFuncAfter(context *HttpContext, option RouterOption)
+	RouterKey() string
 
 	/**
 	 *	controller info
@@ -168,7 +181,7 @@ type IRouter interface {
  *	@param reqPathNoSuffix 		the no suffix request path
  *	@param reqSuffix			url request suffix
  */
-func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (router IRouter, option RouterOption, statusCode HttpStatus) {
+func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (router IRouter, option *RouterOption, statusCode HttpStatus) {
 
 	statusCode = Status404
 
@@ -189,6 +202,10 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 		if keyLen <= reqPathLen && key == lowerReqPath[:keyLen] {
 
 			if r, ok := context.lvServer.routers[key]; ok {
+				statusCode = Status200
+				router = r
+
+				option = new(RouterOption)
 				option.AppName = context.lvServer.AppName()
 
 				if 0 != len(reqSuffix) {
@@ -205,8 +222,8 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 
 				option.RouterKey = key
 				option.RouterPath = lowerReqPath[keyLen:]
-				statusCode = Status200
-				router = r
+
+				router.AfterRouterParse(context, option)
 			} else {
 				//	基本上不会进来此处
 				context.lvServer.log.Error("lv.routerKeys contains %#v and lv.routers not contains %#v", key, key)
