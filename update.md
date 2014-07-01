@@ -4,8 +4,7 @@ Leafveingo update log
 
 ####version 0.0.2.000 rc1(还在整改，并且还未测试)
 1. 重新整理leafveingo
-> 主要整改：独立端口的Server、灵活的路由接口、在一个端口下也可以整合多个项目
-> 
+> * 主要整改：独立端口的Server、灵活的路由接口、在一个端口下也可以整合多个项目
 > * config.go 重新设计架构
 > * template/lv_template.go 修改初始化操作
 > * session/lv_session.go 修改初始化操作，并且修改sessionManager的引用；增加Free操作
