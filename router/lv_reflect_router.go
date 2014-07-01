@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2014-06-16
-//  Update on 2014-06-30
+//  Update on 2014-07-02
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -37,8 +37,7 @@ var (
 //	reflect router other option
 //
 type ReflectRouterOption struct {
-	scheme string // "http" || "https" || ""(wildcard)
-	host   string // "svn.slowfei.com" || "wwww.slowfei.com" || ""(wildcard)
+	ControllerOption
 }
 
 /**
@@ -46,8 +45,8 @@ type ReflectRouterOption struct {
  */
 func DefaultReflectRouterOption() ReflectRouterOption {
 	option := ReflectRouterOption{}
-	option.host = ""
-	option.scheme = ""
+	option.ControllerOption.SetHost("")
+	option.ControllerOption.SetScheme("")
 	return option
 }
 
@@ -56,7 +55,7 @@ func DefaultReflectRouterOption() ReflectRouterOption {
  *	"http" || "https" || ""(wildcard)
  */
 func (o *ReflectRouterOption) SetScheme(scheme string) *ReflectRouterOption {
-	o.scheme = scheme
+	o.ControllerOption.SetScheme(scheme)
 	return o
 }
 
@@ -65,7 +64,7 @@ func (o *ReflectRouterOption) SetScheme(scheme string) *ReflectRouterOption {
  *	"svn.slowfei.com" || "wwww.slowfei.com" || ""(wildcard)
  */
 func (o *ReflectRouterOption) SetHost(host string) *ReflectRouterOption {
-	o.host = host
+	o.ControllerOption.SetHost(host)
 	return o
 }
 
@@ -73,7 +72,7 @@ func (o *ReflectRouterOption) SetHost(host string) *ReflectRouterOption {
  *	checked params
  */
 func (o *ReflectRouterOption) checked() {
-
+	o.ControllerOption.Checked()
 }
 
 //
@@ -120,6 +119,7 @@ type ReflectRouter struct {
 	ctlRefVal       reflect.Value         // controller reflect value
 	checkFuncName   map[string]int        // check func name map
 
+	option  ReflectRouterOption
 	info    string
 	typestr string
 }
@@ -148,6 +148,7 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
 	refRouter.routerKey = routerKey
 	refRouter.checkFuncName = make(map[string]int)
 	refRouter.ctlRefVal = reflect.ValueOf(controller)
+	refRouter.option = option
 
 	if refRouter.ctlRefVal.Type().Implements(RefTypeBeforeAfterController) {
 		refRouter.implBeforeAfter = controller.(BeforeAfterController)
@@ -270,6 +271,12 @@ func (r *ReflectRouter) getFuncArgs(funcType reflect.Type, context *HttpContext)
 
 func (r *ReflectRouter) AfterRouterParse(context *HttpContext, option *RouterOption) HttpStatus {
 	statusCode := Status200
+
+	scheme := r.option.Scheme()
+
+	if 0 != len(scheme) && scheme != context.Request.URL.Scheme {
+		return Status404
+	}
 
 	if reflect.Ptr != r.ctlRefVal.Kind() {
 		option.RouterDataRefVal = reflect.New(r.ctlRefVal.Type())
@@ -447,7 +454,14 @@ func (r *ReflectRouter) ParseTemplatePath(context *HttpContext, funcName string,
 		name = name[:nameLen-1]
 	}
 
-	return path + "/" + name + context.LVServer().TemplateSuffix()
+	hostPath := ""
+	host := context.RequestHost()
+	if 0 != len(host) {
+		//	为什么不使用ReflectRouterOption？ 主要因为不是指针类型，获取结构会copy一次，所以使用context来获取Host(context中的host与option是一致的)
+		hostPath = host + "/"
+	}
+
+	return hostPath + path + "/" + name + context.LVServer().TemplateSuffix()
 }
 
 func (r *ReflectRouter) CallFuncAfter(context *HttpContext, option *RouterOption) {
@@ -463,6 +477,10 @@ func (r *ReflectRouter) CallFuncAfter(context *HttpContext, option *RouterOption
 
 func (r *ReflectRouter) RouterKey() string {
 	return r.routerKey
+}
+
+func (r *ReflectRouter) ControllerOption() ControllerOption {
+	return r.option.ControllerOption
 }
 
 func (r *ReflectRouter) Info() string {

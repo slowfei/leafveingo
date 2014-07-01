@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-10
-//  Update on 2013-10-23
+//  Update on 2014-07-02
 //  Email  slowfei@foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -41,6 +41,9 @@ var (
 	//	Leafveingo 配置对象未初始化
 	ErrLeafveinInitLoadConfig    = NewLeafveinError("Leafvein initialized load config error.")
 	ErrLeafveinLoadDefaultConfig = NewLeafveinError("Leafvein load default config error.")
+
+	//	host nil
+	ErrLeafveinSetHostNil = NewLeafveinError("Leafvein set host len()==0 or nil.")
 
 	//	template path pase is nil
 	ErrTemplatePathParseNil = NewLeafveinError("template path parse is nil.")

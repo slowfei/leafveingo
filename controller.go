@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-16
-//  Update on 2014-06-30
+//  Update on 2014-07-02
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -36,6 +36,56 @@ var (
 	RefTypeBeforeAfterController = reflect.TypeOf((*BeforeAfterController)(nil)).Elem()
 	RefTypeAdeRouterController   = reflect.TypeOf((*AdeRouterController)(nil)).Elem()
 )
+
+//#pragma mark interface option ----------------------------------------------------------------------------------------------------
+
+type ControllerOption struct {
+	scheme string // "http" || "https" || ""(wildcard)
+	host   string // "svn.slowfei.com" || "wwww.slowfei.com" || "slowfei.com" || ""(wildcard)
+}
+
+/**
+ *	get sheme
+ *
+ *	@return
+ */
+func (c ControllerOption) Scheme() string {
+	return c.scheme
+}
+
+/**
+ *	set scheme
+ *	"http" || "https" || ""(wildcard)
+ */
+func (c *ControllerOption) SetScheme(scheme string) *ControllerOption {
+	c.scheme = scheme
+	return c
+}
+
+/**
+ *	get host
+ *
+ *	@return
+ */
+func (c ControllerOption) Host() string {
+	return c.host
+}
+
+/**
+ *	set host
+ *	"svn.slowfei.com" || "wwww.slowfei.com" || ""(wildcard)
+ */
+func (c *ControllerOption) SetHost(host string) *ControllerOption {
+	c.host = host
+	return c
+}
+
+/**
+ *	checked params
+ */
+func (c *ControllerOption) Checked() {
+
+}
 
 //
 //	before after interface
@@ -78,6 +128,8 @@ type AdeRouterController interface {
 	 */
 	RouterMethodParse(option *RouterOption) (funcName string, params map[string]string)
 }
+
+//#pragma mark Leafveingo method ----------------------------------------------------------------------------------------------------
 
 /**
  *	controller call handle
@@ -217,7 +269,7 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 			panic(ErrControllerDispatcherFuncNameNil)
 		}
 
-		if router, ok := context.lvServer.routers[cvt.RouterKey]; ok {
+		if router, ok := context.routerElement.routers[cvt.RouterKey]; ok {
 			//	request的一些设置由调用者直接进行设置Header
 			for k, v := range cvt.Headers {
 				context.Request.Header.Set(k, v)
@@ -232,7 +284,7 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 			statusCode = Status500
 			//	这个是自定义写代码的转发，如果查找不到相当于是调用者代码问题，所以直接抛出异常（恐慌）。
 			dnfErr := *ErrControllerDispatcherNotFound
-			dnfErr.UserInfo = "router key:" + cvt.RouterKey
+			dnfErr.UserInfo = "host:" + context.routerElement.host + "; router key:" + cvt.RouterKey
 			panic(&dnfErr)
 		}
 

@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-14
-//  Update on 2014-06-30
+//  Update on 2014-07-02
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -54,6 +54,15 @@ func AddRouter(appName string, router IRouter) {
 }
 
 //#pragma mark interface option ----------------------------------------------------------------------------------------------------
+
+//
+//	router element
+//
+type RouterElement struct {
+	host       string
+	routerKeys []string
+	routers    map[string]IRouter
+}
 
 //
 //	router option
@@ -165,9 +174,12 @@ type IRouter interface {
 	RouterKey() string
 
 	/**
-	 *	controller info
-	 *
-	 *	@return
+	 *	@return controller option
+	 */
+	ControllerOption() ControllerOption
+
+	/**
+	 *	@return controller info
 	 */
 	Info() string
 }
@@ -194,44 +206,60 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 
 	reqPathLen := len(lowerReqPath)
 
-	keys := context.lvServer.routerKeys
-	count := len(keys)
-	for i := 0; i < count; i++ {
-		key := keys[i]
-		keyLen := len(key)
-		if keyLen <= reqPathLen && key == lowerReqPath[:keyLen] {
+	// FOR routerList -> IF host -> FOR keys -> IF reqPath
 
-			if r, ok := context.lvServer.routers[key]; ok {
-				statusCode = Status200
-				router = r
+	listCount := len(context.lvServer.routerList)
+	for i := 0; i < listCount; i++ {
+		element := context.lvServer.routerList[i]
 
-				option = new(RouterOption)
-				option.AppName = context.lvServer.AppName()
+		if context.reqHost == element.host {
 
-				if 0 != len(reqSuffix) {
-					if '.' == reqSuffix[0] {
-						reqSuffix = reqSuffix[1:]
+			keyCount := len(element.routerKeys)
+			for j := 0; j < keyCount; j++ {
+
+				key := element.routerKeys[i]
+				keyLen := len(key)
+
+				if keyLen <= reqPathLen && key == lowerReqPath[:keyLen] {
+
+					if iR, ok := element.routers[key]; ok {
+						statusCode = Status200
+						router = iR
+						context.routerElement = element
+
+						option = new(RouterOption)
+						option.AppName = context.lvServer.AppName()
+
+						if 0 != len(reqSuffix) {
+							if '.' == reqSuffix[0] {
+								reqSuffix = reqSuffix[1:]
+							}
+							option.UrlSuffix = SFStringsUtil.ToLower(reqSuffix)
+						}
+
+						option.RequestMethod = SFStringsUtil.ToLower(context.Request.Method)
+						if 0 == len(option.RequestMethod) {
+							option.RequestMethod = "get"
+						}
+
+						option.RouterKey = key
+						option.RouterPath = lowerReqPath[keyLen:]
+
+						router.AfterRouterParse(context, option)
+					} else {
+						//	基本上不会进来此处
+						context.lvServer.log.Error("lv.routerKeys contains %#v and lv.routers not contains %#v", key, key)
+						statusCode = Status404
 					}
-					option.UrlSuffix = SFStringsUtil.ToLower(reqSuffix)
-				}
+					return
 
-				option.RequestMethod = SFStringsUtil.ToLower(context.Request.Method)
-				if 0 == len(option.RequestMethod) {
-					option.RequestMethod = "get"
-				}
+				} // end  keyLen <= reqPathLen && key == lowerReqPath[:keyLen]
 
-				option.RouterKey = key
-				option.RouterPath = lowerReqPath[keyLen:]
+			} // end j := 0; j < keyCount; j++
 
-				router.AfterRouterParse(context, option)
-			} else {
-				//	基本上不会进来此处
-				context.lvServer.log.Error("lv.routerKeys contains %#v and lv.routers not contains %#v", key, key)
-				statusCode = Status404
-			}
-			break
-		}
-	}
+		} // end context.reqHost == element.host
+
+	} // end i := 0; i < listCount; i++
 
 	return
 }

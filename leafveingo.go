@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2014-06-27
+//  Update on 2014-07-02
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
@@ -59,6 +59,13 @@ const (
 	//	不知道为什么golang使用http.ServeFile判断为此结尾就重定向到/index.html中。
 	//	这里定义主要用来解决这个问题的处理
 	INDEX_PAGE = "/index.html"
+
+	//	url params host key
+	URL_HOST_KEY = "host"
+
+	//	hosts www
+	URL_HOST_WWW     = "www."
+	URL_HOST_WWW_LEN = 4
 )
 
 var (
@@ -217,9 +224,10 @@ type LeafveinServer struct {
 	serverTimeout       int64             // server time out, default 0
 	sessionMaxlifeTime  int32             // http session maxlife time, unit second. use session set
 	isReqPathIgnoreCase bool              // request url path ignore case
+	multiProjectHosts   []string          // setting integrated multi-project hosts
 
 	templateSuffix string // template suffix
-	isCompactHTML  bool   // is Compact HTML, 默认true
+	isCompactHTML  bool   // is Compact HTML, default true
 
 	logConfigPath string // log config path
 	logGroup      string // log group name
@@ -234,8 +242,7 @@ type LeafveinServer struct {
 	/* #mark router patams ******************/
 
 	// all router storage map and router keys
-	routers    map[string]IRouter
-	routerKeys []string
+	routerList []*RouterElement
 
 	/* #mark system patams ******************/
 
@@ -303,7 +310,6 @@ func (lv *LeafveinServer) initPrivate(option ServerOption) {
 
 	lv.isStart = false
 
-	lv.routers = make(map[string]IRouter)
 	lv.application = SFHelper.NewMap()
 	lv.operatingDir = filepath.Join(SFFileManager.GetExecDir(), lv.appName)
 
@@ -358,6 +364,7 @@ func (lv *LeafveinServer) configReload(cf *Config) {
 	lv.SetReqPathIgnoreCase(cf.IsReqPathIgnoreCase)
 	lv.SetTemplateSuffix(cf.TemplateSuffix)
 	lv.SetRespWriteCompress(cf.IsRespWriteCompress)
+	lv.SetMultiProjectHosts(cf.MultiProjectHosts...)
 	lv.userData = cf.UserData
 
 	//	restart
@@ -440,9 +447,9 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 		}
 	}
 
-	//	validate routers nil
-	if 0 == len(lv.routers) {
-		lv.log.Fatal("LeafveinServer %v fatal: routers == nil \n", startName)
+	//	validate routerList nil
+	if 0 == len(lv.routerList) {
+		lv.log.Fatal("LeafveinServer %v fatal: routerList == nil \n", startName)
 		return false
 	}
 
@@ -457,8 +464,11 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 
 	//	print log info
 	*logInfo += "controller:\n"
-	for key, value := range lv.routers {
-		*logInfo += fmt.Sprintf("[%#v] %v\n", key, value.Info())
+
+	for _, element := range lv.routerList {
+		for key, value := range element.routers {
+			*logInfo += fmt.Sprintf("[%#v][%#v] %v\n", element.host, key, value.Info())
+		}
 	}
 
 	return true
@@ -678,16 +688,32 @@ func (lv *LeafveinServer) AddRouter(router IRouter) {
 		routerKey = SFStringsUtil.ToLower(routerKey)
 	}
 
-	if v, ok := lv.routers[routerKey]; ok {
-		lv.log.Warn("[%#v]router key already exists(IRouter:%#v), (IRouter:%#v)can not add.", routerKey, v.Info(), router.Info())
+	controllerHost := router.ControllerOption().Host()
+	var element *RouterElement = nil
+
+	for _, elem := range lv.routerList {
+		if elem.host == controllerHost {
+			element = elem
+			break
+		}
+	}
+
+	if nil == element {
+		element = new(RouterElement)
+		element.host = controllerHost
+		element.routers = make(map[string]IRouter)
+	}
+
+	if v, ok := element.routers[routerKey]; ok {
+		lv.log.Warn("[%#v][%#v]router key already exists(IRouter:%#v), (IRouter:%#v)can not add.", controllerHost, routerKey, v.Info(), router.Info())
 		return
 	}
 
-	lv.routers[routerKey] = router
-	lv.routerKeys = append(lv.routerKeys, routerKey)
+	element.routers[routerKey] = router
+	element.routerKeys = append(element.routerKeys, routerKey)
 
 	//	由长到短进行排序
-	sort.Sort(sort.Reverse(SFStringsUtil.SortLengToShort(lv.routerKeys)))
+	sort.Sort(sort.Reverse(SFStringsUtil.SortLengToShort(element.routerKeys)))
 }
 
 /**
@@ -916,6 +942,37 @@ func (lv *LeafveinServer) IsReqPathIgnoreCase() bool {
 }
 
 /**
+ *	set multi-project hosts access
+ *
+ *	@param hosts "slowfei.com"(www.slwofei.com) || "svn.slowfei.com"
+ */
+func (lv *LeafveinServer) SetMultiProjectHosts(hosts ...string) {
+	temp := make([]string, len(hosts))
+
+	for i, host := range hosts {
+		if 0 == len(host) {
+			panic(ErrLeafveinSetHostNil)
+		}
+
+		if URL_HOST_WWW_LEN < len(host) && URL_HOST_WWW == host[URL_HOST_WWW_LEN:] {
+			host = host[:URL_HOST_WWW_LEN]
+		}
+		temp[i] = host
+	}
+
+	lv.multiProjectHosts = temp
+}
+
+/**
+ *	get project hosts
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) MultiProjectHosts() []string {
+	return lv.multiProjectHosts
+}
+
+/**
  *	set static resource file suffixes
  *
  *	@param suffixes default ".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"
@@ -1021,8 +1078,6 @@ func (lv *LeafveinServer) Charset() string {
  *	is ResponseWriter writer compress gizp...
  *	According Accept-Encoding select compress type
  *
- *  Note: need to restart Leafvein Server
- *
  *	@param b default true
  */
 func (lv *LeafveinServer) SetRespWriteCompress(b bool) {
@@ -1078,7 +1133,7 @@ func (lv *LeafveinServer) LogConfPath() string {
 /**
  *	set log group name
  *
- *	Note: need to restart application
+ *	Note: need to restart Leafvein Server
  *
  *	@param groupName
  */
@@ -1130,13 +1185,68 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		reqPath = "/"
 	}
 
-	//	get url ext suffix
+	//	request suffix, host
 	reqSuffix := path.Ext(reqPath)
+	reqHost := ""
+
+	hostsCount := len(lv.multiProjectHosts)
+	if 0 != hostsCount {
+		reqHost = req.URL.Host
+		reqHostLen := len(reqHost)
+
+		//	remove port
+		index := -1
+		for i := reqHostLen - 1; i >= reqHostLen-7; i-- {
+			if ':' == reqHost[i] {
+				index = i
+				break
+			}
+		}
+		if -1 != index {
+			reqHost = reqHost[:index]
+		}
+
+		//	replace 127.0.0.1 host
+		if lv.IsDevel() {
+			if "localhost" == reqHost || "127.0.0.1" == reqHost {
+				urlHost := req.URL.Query().Get(URL_HOST_KEY)
+				if 0 != len(urlHost) {
+					reqHost = urlHost
+				}
+			}
+		}
+
+		//	remove "www."
+		if URL_HOST_WWW_LEN < len(reqHost) && URL_HOST_WWW == reqHost[URL_HOST_WWW_LEN:] {
+			reqHost = reqHost[:URL_HOST_WWW_LEN]
+		}
+
+		//	checked multi-project host
+		pass := false
+		for i := 0; i < hostsCount; i++ {
+			proHost := lv.multiProjectHosts[i]
+			if proHost == reqHost {
+				pass = true
+			}
+		}
+
+		if !pass {
+			lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "Host("+reqHost+") invalid", ""), rw)
+			return
+		}
+	}
 
 	//	static file handle
 	if 0 != len(reqSuffix) {
 		if _, ok := lv.staticFileSuffixes[reqSuffix]; ok {
-			filePath := lv.WebRootDir() + reqPath
+
+			var filePath string
+
+			if 0 != len(reqHost) {
+				filePath = lv.WebRootDir() + "/" + reqHost + reqPath
+			} else {
+				filePath = lv.WebRootDir() + reqPath
+			}
 
 			if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
 				//	处理http.ServeFile函数遇到/index.html被重定向到./的问题
@@ -1158,6 +1268,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	//	create context
 	context = newContext(lv, rw, req, lv.isRespWriteCompress)
+	context.reqHost = reqHost
 
 	//	router parse
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)

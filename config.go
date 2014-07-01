@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-11-06
-//  Update on 2014-06-12
+//  Update on 2014-07-02
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -62,6 +62,7 @@ var (
 		"ServerTimeout"		:0,
 		"SessionMaxlifeTime"	:1800,
 		"IsReqPathIgnoreCase"	: true,
+		"MultiProjectHosts"		:[],
 
 		"TemplateSuffix"	:".tpl",
 		"IsCompactHTML"			:true,
@@ -87,6 +88,7 @@ type Config struct {
 	ServerTimeout       int64    // server time out, default 0
 	SessionMaxlifeTime  int32    // http session maxlife time, unit second. use session set
 	IsReqPathIgnoreCase bool     // request url path ignore case
+	MultiProjectHosts   []string // setting integrated multi-project hosts,default nil
 
 	TemplateSuffix string // template suffix
 	IsCompactHTML  bool   // is Compact HTML, 默认true

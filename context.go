@@ -13,11 +13,13 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-13
-//  Update on 2014-06-27
+//  Update on 2014-07-02
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
-//	leafveingo web 每次请求的上下文封装
+//
+//	leafveingo web request context
+//
 package leafveingo
 
 import (
@@ -38,15 +40,14 @@ const (
 
 //	request context
 type HttpContext struct {
-	//	TODO 预留改版的扩展
-	super *HttpContext
-
 	lvServer        *LeafveinServer       //
 	reqBody         []byte                //
 	session         LVSession.HttpSession //
+	reqHost         string                // request host, integrated multi-project use.
+	routerElement   *RouterElement        // router list element
 	routerKeys      []string              // router keys
 	funcNames       []string              // request controller method names
-	contentEncoding string                // 压缩类型存储
+	contentEncoding string                // encoding; "none" || "gzip"...
 	comperssWriter  io.Writer             //
 	isCloseWriter   bool                  // is cell closeWriter()
 
@@ -112,6 +113,7 @@ func (ctx *HttpContext) free() {
 	ctx.comperssWriter = nil
 	ctx.RespWrite = nil
 	ctx.Request = nil
+	ctx.routerElement = nil
 }
 
 /**
@@ -300,7 +302,18 @@ func (ctx *HttpContext) RouterKeys() []string {
 }
 
 /**
+ *	request host
+ *
+ *	@return
+ */
+func (ctx *HttpContext) RequestHost() string {
+	return ctx.reqHost
+}
+
+/**
  *	request controller methods
+ *
+ *	@return
  */
 func (ctx *HttpContext) FuncNames() []string {
 	return ctx.funcNames
@@ -309,6 +322,9 @@ func (ctx *HttpContext) FuncNames() []string {
 /**
  *	response comperss write
  *	会根据Accept-Encoding支持的格式进行压缩，优先gzip
+ *
+ *	@param body write content
+ *	@param code	status code
  */
 func (ctx *HttpContext) RespBodyWrite(body []byte, code HttpStatus) {
 	ctx.RespWrite.Header().Set("Content-Encoding", ctx.contentEncoding)
