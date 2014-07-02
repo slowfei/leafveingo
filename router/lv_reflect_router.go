@@ -71,37 +71,47 @@ func (o *ReflectRouterOption) SetHost(host string) *ReflectRouterOption {
 /**
  *	checked params
  */
-func (o *ReflectRouterOption) checked() {
+func (o *ReflectRouterOption) Checked() {
 	o.ControllerOption.Checked()
 }
 
 //
 //	reflect router
 //
+//	default template parh: [host]/[routerKey]/[funcNme].[TemplateSuffix]
+//						   "[host]/" multi-project use, lefveinServer.SetMultiProjectHosts("slowfei.com","svn.slowfei.com")
 //	rule:
+//
 //		router key = "/"
 //			   URL = GET http://localhost:8080/
 //		 func name = Index
+//	 template path = [host]/Index.tpl
 //
 //		router key = "/"
 //			   URL = POST http://localhost:8080/
 //		 func name = PostIndex
+//	 template path = [host]/PostIndex.tpl
 //
 //		router key = "/"
 //			   URL = Get http://localhost:8080/user#!list
 //		 func name = UserList
+//	 template path = [host]/UserList.tpl
 //
 //		router key = "/"
 //			   URL = Post http://localhost:8080/user[^a-zA-Z]+list[^a-zA-Z]+auto
 //		 func name = PostUserListAuto
+//	 template path = [host]/PostUserListAuto.tpl
 //
 //		router key = "/admin/"
 //			   URL = GET http://localhost:8080/admin/login
 //		 func name = Login
+//	 template path = [host]/admin/Login.tpl
 //
 //		router key = "/admin/"
 //			   URL = POST http://localhost:8080/admin/login
 //		 func name = PostLogin
+//	 template path = [host]/admin/PostLogin.tpl
+//
 //
 //	控制器分的指针传递和值传递
 //		值传递：
@@ -112,6 +122,7 @@ func (o *ReflectRouterOption) checked() {
 //		CreateReflectController("/admin/", &AdminController{})
 //		跟值传递相反，每次请求时都会使用设置的控制器地址进行处理，应用结束也不会改变，每次请求控制器都不会改变内存地址
 //		这里涉及到并发时同时使用一个内存地址处理的问题，不过目前还没有弄到锁，并发后期会进行改进和处理。
+//
 type ReflectRouter struct {
 	routerKey       string                // router key
 	implBeforeAfter BeforeAfterController // implement interface
@@ -140,7 +151,7 @@ func CreateReflectController(routerKey string, controller interface{}) IRouter {
  *	@param option 	other params option
  */
 func CreateReflectControllerWithOption(routerKey string, controller interface{}, option ReflectRouterOption) IRouter {
-	option.checked()
+	option.Checked()
 	strBeforeAfter := ""
 	strAde := ""
 
@@ -150,14 +161,14 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
 	refRouter.ctlRefVal = reflect.ValueOf(controller)
 	refRouter.option = option
 
-	if refRouter.ctlRefVal.Type().Implements(RefTypeBeforeAfterController) {
-		refRouter.implBeforeAfter = controller.(BeforeAfterController)
-		strBeforeAfter = "(Implemented BeforeAfterController)"
-	}
-
 	if refRouter.ctlRefVal.Type().Implements(RefTypeAdeRouterController) {
 		refRouter.implAdeRouter = controller.(AdeRouterController)
 		strAde = "(Implemented AdeRouterController)"
+	}
+
+	if refRouter.ctlRefVal.Type().Implements(RefTypeBeforeAfterController) {
+		refRouter.implBeforeAfter = controller.(BeforeAfterController)
+		strBeforeAfter = "(Implemented BeforeAfterController)"
 	}
 
 	refType := refRouter.ctlRefVal.Type()
@@ -170,7 +181,7 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
 	}
 
 	refRouter.typestr = refType.String()
-	refRouter.info = fmt.Sprintf("%v  \t router : %#v  %v%v", refType, routerKey, strBeforeAfter, strAde)
+	refRouter.info = fmt.Sprintf("ReflectRouter(%v) router: %#v  %v%v", refType, routerKey, strBeforeAfter, strAde)
 
 	return refRouter
 }
@@ -274,7 +285,7 @@ func (r *ReflectRouter) AfterRouterParse(context *HttpContext, option *RouterOpt
 
 	scheme := r.option.Scheme()
 
-	if 0 != len(scheme) && scheme != context.Request.URL.Scheme {
+	if 0 != len(scheme) && scheme != context.RequestScheme() {
 		return Status404
 	}
 
@@ -457,7 +468,6 @@ func (r *ReflectRouter) ParseTemplatePath(context *HttpContext, funcName string,
 	hostPath := ""
 	host := context.RequestHost()
 	if 0 != len(host) {
-		//	为什么不使用ReflectRouterOption？ 主要因为不是指针类型，获取结构会copy一次，所以使用context来获取Host(context中的host与option是一致的)
 		hostPath = host + "/"
 	}
 
