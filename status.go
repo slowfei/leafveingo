@@ -17,7 +17,7 @@
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
-//	leafveingo web 状态页处理
+// web status page manager
 package leafveingo
 
 import (

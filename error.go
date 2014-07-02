@@ -17,7 +17,9 @@
 //  Email  slowfei@foxmail.com
 //  Home   http://www.slowfei.com
 
-//	leafveingo 错误信息， 使用struct进行同一管理leafveingo发生的错误
+//
+//	error info manager
+//
 package leafveingo
 
 import (

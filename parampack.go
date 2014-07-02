@@ -17,7 +17,9 @@
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
-//	leafveingo web form的参数解析封装结构
+//
+//	web form params pack struct
+//
 package leafveingo
 
 import (
