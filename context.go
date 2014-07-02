@@ -18,7 +18,7 @@
 //  Home   http://www.slowfei.com
 
 //
-//	leafveingo web request context
+//  web request context
 //
 package leafveingo
 
@@ -115,15 +115,6 @@ func (ctx *HttpContext) free() {
 	ctx.RespWrite = nil
 	ctx.Request = nil
 	ctx.routerElement = nil
-}
-
-/**
- *	get current leafvein server
- *
- *	@return *LeafveinServer
- */
-func (ctx *HttpContext) LVServer() *LeafveinServer {
-	return ctx.lvServer
 }
 
 /**
@@ -294,42 +285,6 @@ func (ctx *HttpContext) RequestBody() []byte {
 }
 
 /**
- *	requset router keys
- *
- *	@return
- */
-func (ctx *HttpContext) RouterKeys() []string {
-	return ctx.routerKeys
-}
-
-/**
- *	request host
- *
- *	@return lowercase string
- */
-func (ctx *HttpContext) RequestHost() string {
-	return ctx.reqHost
-}
-
-/**
- *	request scheme
- *
- *	@return lowercase string
- */
-func (ctx *HttpContext) RequestScheme() string {
-	return ctx.reqScheme
-}
-
-/**
- *	request controller methods
- *
- *	@return
- */
-func (ctx *HttpContext) FuncNames() []string {
-	return ctx.funcNames
-}
-
-/**
  *	response comperss write
  *	会根据Accept-Encoding支持的格式进行压缩，优先gzip
  *
@@ -487,4 +442,59 @@ func (ctx *HttpContext) PackStructFormByRefType(structType reflect.Type) (refVal
 	}
 
 	return
+}
+
+/**
+ *	get current leafvein server
+ *
+ *	@return *LeafveinServer
+ */
+func (ctx *HttpContext) LVServer() *LeafveinServer {
+	return ctx.lvServer
+}
+
+/**
+ *	get router list element
+ *
+ *	@return *RouterElement
+ */
+func (ctx *HttpContext) GetIRouter(routerKey string) (IRouter, bool) {
+	router, ok := ctx.routerElement.routers[routerKey]
+	return router, ok
+}
+
+/**
+ *	requset router keys
+ *
+ *	@return
+ */
+func (ctx *HttpContext) RouterKeys() []string {
+	return ctx.routerKeys
+}
+
+/**
+ *	request host
+ *
+ *	@return lowercase string
+ */
+func (ctx *HttpContext) RequestHost() string {
+	return ctx.reqHost
+}
+
+/**
+ *	request scheme
+ *
+ *	@return lowercase string
+ */
+func (ctx *HttpContext) RequestScheme() string {
+	return ctx.reqScheme
+}
+
+/**
+ *	request controller methods
+ *
+ *	@return
+ */
+func (ctx *HttpContext) FuncNames() []string {
+	return ctx.funcNames
 }
