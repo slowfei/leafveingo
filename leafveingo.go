@@ -1191,7 +1191,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	hostsCount := len(lv.multiProjectHosts)
 	if 0 != hostsCount {
-		reqHost = req.URL.Host
+		reqHost = SFStringsUtil.ToLower(req.URL.Host)
 		reqHostLen := len(reqHost)
 
 		//	remove port
@@ -1269,6 +1269,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//	create context
 	context = newContext(lv, rw, req, lv.isRespWriteCompress)
 	context.reqHost = reqHost
+	context.reqScheme = SFStringsUtil.ToLower(req.URL.Scheme)
 
 	//	router parse
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)

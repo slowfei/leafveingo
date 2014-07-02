@@ -43,7 +43,8 @@ type HttpContext struct {
 	lvServer        *LeafveinServer       //
 	reqBody         []byte                //
 	session         LVSession.HttpSession //
-	reqHost         string                // request host, integrated multi-project use.
+	reqHost         string                // request host lowercase, integrated multi-project use.
+	reqScheme       string                // request scheme lowercase
 	routerElement   *RouterElement        // router list element
 	routerKeys      []string              // router keys
 	funcNames       []string              // request controller method names
@@ -304,10 +305,19 @@ func (ctx *HttpContext) RouterKeys() []string {
 /**
  *	request host
  *
- *	@return
+ *	@return lowercase string
  */
 func (ctx *HttpContext) RequestHost() string {
 	return ctx.reqHost
+}
+
+/**
+ *	request scheme
+ *
+ *	@return lowercase string
+ */
+func (ctx *HttpContext) RequestScheme() string {
+	return ctx.reqScheme
 }
 
 /**
