@@ -192,9 +192,13 @@ func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOp
 /**
  *	controller return value handle
  *
- *	@param returnValue	call controller return value
- *	@param context
- *	@param tplPath template access path, no suffix
+ *	@param returnValue	body return value
+ *	@param context		leafvein http context
+ *	@param router		router interface
+ *	@param option		router option
+ *	@param funcName		request call controller func name
+ *	@return statusCode	http status code
+ *	@return err			error info
  */
 func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, router IRouter, option *RouterOption, funcName string) (statusCode HttpStatus, err error) {
 	statusCode = Status200
@@ -289,14 +293,27 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 		}
 
 	case ServeFilePath:
+		statusCode = Status404
 
-		context.RespWrite.Header().Del("Content-Encoding")
-		filePath := path.Join(lv.WebRootDir(), string(cvt))
+		filePath := string(cvt)
+		if 0 != len(filePath) {
 
-		if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
-			http.ServeFile(context.RespWrite, context.Request, filePath)
-		} else {
-			statusCode = Status404
+			jsonChrt := ""
+			if '/' != filePath[0] {
+				jsonChrt = "/"
+			}
+
+			context.RespWrite.Header().Del("Content-Encoding")
+
+			fullPath := lv.WebRootDir() + jsonChrt + filePath
+
+			if isExists, isDir, _ := SFFileManager.Exists(fullPath); isExists && !isDir {
+				statusCode = Status200
+
+				_, fileName := path.Split(filePath)
+				context.RespWrite.Header().Set("Content-Disposition", "attachment;filename=\""+fileName+"\"")
+				http.ServeFile(context.RespWrite, context.Request, fullPath)
+			}
 		}
 
 	default:

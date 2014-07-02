@@ -18,7 +18,7 @@
 //  Home   http://www.slowfei.com
 
 //
-//	leafveingo web response返回结果的处理
+// response body result out
 //
 package leafveingo
 
@@ -152,7 +152,6 @@ func BodyCallControllerByHeaders(routerKey, funcName string, setHeaders map[stri
  *	@return ServeFilePath
  */
 func BodyServeFile(path string) ServeFilePath {
-	//	TODO 输出文件的浏览器保存时名称默认可能是url的地址结尾名称，这个可能需要优化。
 	return ServeFilePath(path)
 }
 
