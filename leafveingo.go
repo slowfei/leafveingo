@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2014-07-02
+//  Update on 2014-07-04
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
@@ -153,8 +153,8 @@ type ServerOption struct {
 /**
  *	default server option value
  */
-func DefaultOption() ServerOption {
-	option := ServerOption{}
+func DefaultOption() *ServerOption {
+	option := &ServerOption{}
 	option.addr = "127.0.0.1"
 	option.port = 8080
 	option.smgcTime = LVSession.DEFAULT_SCAN_GC_TIME
@@ -248,7 +248,7 @@ type LeafveinServer struct {
 
 	application    SFHelper.Map                  //	application
 	sessionManager *LVSession.HttpSessionManager //	http session manager
-	template       LVTemplate.ITemplate          //	template
+	template       *LVTemplate.Template          //	template
 	log            *SFLog.SFLogger
 
 	//	current leafveingo the file operation directory
@@ -294,6 +294,12 @@ func NewLeafveinServer(appName string, option ServerOption) *LeafveinServer {
  */
 func (lv *LeafveinServer) initPrivate(option ServerOption) {
 
+	lv.template = LVTemplate.NewTemplate()
+	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, Version)
+	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_NAME, lv.AppName)
+	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_VERSION, lv.AppVersion)
+	lv.template.SetFunc(TEMPLATE_FUNC_KEY_IS_DEVEL, lv.IsDevel)
+
 	lv.configLoadDefault()
 
 	//	config handle
@@ -312,12 +318,6 @@ func (lv *LeafveinServer) initPrivate(option ServerOption) {
 
 	lv.application = SFHelper.NewMap()
 	lv.operatingDir = filepath.Join(SFFileManager.GetExecDir(), lv.appName)
-
-	lv.template = LVTemplate.NewTemplate()
-	lv.template.SetFunc(TEMPLATE_FUNC_KEY_VERSION, Version)
-	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_NAME, lv.AppName)
-	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_VERSION, lv.AppVersion)
-	lv.template.SetFunc(TEMPLATE_FUNC_KEY_IS_DEVEL, lv.IsDevel)
 
 	//	start session manager
 	if 60 <= option.smgcTime {
@@ -471,6 +471,8 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 		}
 	}
 
+	*logInfo += "\n"
+
 	return true
 }
 
@@ -534,7 +536,9 @@ func (lv *LeafveinServer) start(startName string) {
  *
  *	@param context
  */
-func (lv *LeafveinServer) deferServeHTTP(context *HttpContext, rw http.ResponseWriter) {
+func (lv *LeafveinServer) deferServeHTTP(contextPrt **HttpContext, rw http.ResponseWriter) {
+
+	context := *contextPrt
 
 	if err := recover(); err != nil {
 		errStr := fmt.Sprintln(err)
@@ -702,6 +706,7 @@ func (lv *LeafveinServer) AddRouter(router IRouter) {
 		element = new(RouterElement)
 		element.host = controllerHost
 		element.routers = make(map[string]IRouter)
+		lv.routerList = append(lv.routerList, element)
 	}
 
 	if v, ok := element.routers[routerKey]; ok {
@@ -1170,7 +1175,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	var context *HttpContext = nil
 	reqPath := req.URL.Path
 
-	defer lv.deferServeHTTP(context, rw)
+	defer lv.deferServeHTTP(&context, rw)
 
 	//	前缀url清除，call GetHandlerFunc() 才会使用到此操作
 	//	/expand/index = /index
@@ -1316,5 +1321,5 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	lv.log.Info("status code: (" + StatusCodeToString(statusCode) + ")" + errstr)
+	lv.log.Info("status code: (" + StatusCodeToString(statusCode) + ")" + errstr + "\n")
 }
