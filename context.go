@@ -26,6 +26,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"github.com/slowfei/gosfcore/utils/strings"
 	"github.com/slowfei/leafveingo/session"
 	"io"
 	"io/ioutil"
@@ -62,7 +63,8 @@ type HttpContext struct {
 func newContext(server *LeafveinServer, rw http.ResponseWriter, req *http.Request, respWirteCompress bool) *HttpContext {
 	var outWrite io.Writer
 	var err error
-	acceptEncoding := strings.ToLower(req.Header.Get("Accept-Encoding"))
+
+	acceptEncoding := SFStringsUtil.ToLower(req.Header.Get("Accept-Encoding"))
 	encoding := "none"
 
 	if respWirteCompress && 0 <= strings.Index(acceptEncoding, "gzip") {
@@ -105,6 +107,7 @@ func (ctx *HttpContext) closeWriter() {
  *
  */
 func (ctx *HttpContext) free() {
+
 	if !ctx.isCloseWriter {
 		ctx.closeWriter()
 	}
@@ -437,6 +440,11 @@ func (ctx *HttpContext) PackStructFormByRefType(structType reflect.Type) (refVal
 				parampackSetStructFieldValue(refVal, fk, fv)
 			}
 		}
+
+		if reflect.Ptr != structType.Kind() {
+			refVal = refVal.Elem()
+		}
+
 	} else {
 		err = ErrParampackNewStruct
 	}
