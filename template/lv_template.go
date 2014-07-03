@@ -62,13 +62,14 @@ var (
 
 //	模板数据，用于封装使用模板的数据传递
 type TemplateValue struct {
-	TplPath string      //	模板的相对路径
-	Data    interface{} //	模板绑定的数据
+	TplName string      //	template name precedence handle
+	TplPath string      //	template relative path
+	Data    interface{} //	bind data
 }
 
 // 获取模板对象
-func NewTemplate() ITemplate {
-	t := new(lvtemplate)
+func NewTemplate() *Template {
+	t := new(Template)
 	t.initPrivate()
 	return t
 }
@@ -77,79 +78,34 @@ func NewTemplate() ITemplate {
 //	@tplPth		 相对路径
 //	@data		  模板数据
 func NewTemplateValue(tplPath string, data interface{}) TemplateValue {
-	return TemplateValue{tplPath, data}
+	return TemplateValue{TplPath: tplPath, Data: data}
 }
 
-//	new template value
-//	@data		  模板数据
-func NewTemplateValueByData(data interface{}) TemplateValue {
-	return TemplateValue{Data: data}
-}
-
-//	模板使用接口
-type ITemplate interface {
-	//	设置模板函数操作
-	//	请在初始化程序时添加，如果已经缓存的模板不会进行处理
-	//	内置默认函数(具体可查看lv_tempate_func.go)：
-	//			"LVEmbedTempate" LVTemplate.EmbedTempate	//嵌入模板函数
-	//	@key
-	//	@methodFunc
-	SetFunc(key string, methodFunc interface{})
-	DelFunc(key string)
-	DelAllFunc()
-
-	//	设置模板查询主目录,默认"".
-	//	主目录空的话就会按照编译文件所在目录开始查询模板
-	//	@pathDir	完整路径目录
-	SetBaseDir(pathDir string)
-	BaseDir() string
-
-	//	根据相对路径获取模板的完整路径，如果查询不到模板返回""
-	//	@tplPath	模板的相对路径
-	TemplatePathAtName(tplPath string) string
-
-	//	写入模板操作
-	//	@wr
-	//	@value
-	Execute(wr io.Writer, value TemplateValue) error
-
-	//	分析模板
-	//	返回的模板是经过New()->Funcs()->Parse()处理后的
-	//	@tplPath	模板的相对路径
-	//	@return
-	Parse(tplPath string) (*template.Template, error)
-
-	//	解析模板，根据内容进行解析，注意，这里不是模版路径，是模版内容
-	//
-	//	@name	模版名称，名称需要是唯一的。否则可能旧的会被覆盖
-	//	@src	模版内容
-	//	@return
-	ParseString(name, src string) (*template.Template, error)
-
-	//	根据模板相对路径获取模板，如果查询不到返回 nil
-	//	@tplPath	模板的相对路径
-	Get(tplPath string) *template.Template
-
-	//	是否设置模板缓存处理,默认false
-	SetCache(cache bool)
-	IsCache() bool
-
-	//	是否设置压缩HTML代码格式，默认true
-	SetCompactHTML(compact bool)
-	IsCompactHTML() bool
+/**
+ *
+ */
+func NewTemplateValueByName(tplName string, data interface{}) TemplateValue {
+	return TemplateValue{TplName: tplName, Data: data}
 }
 
 //	leafveingo 内置模板结构，用于私有的实现
-type lvtemplate struct {
+type Template struct {
 	funcMap       template.FuncMap   // 模板函数
 	goTemplate    *template.Template // 唯一的模板管理
 	isCache       bool               // 是否加入缓存 默认false
 	isCompactHTML bool               //	是否压缩HTML代码格式，默认true
+	leftDelims    string             //	set the action delimiters left default {{
+	rightDelims   string             //	right default }}
 	baseDir       string             // 模板路径的主目录 默认执行文件目录
 	rwmutex       sync.RWMutex
 }
 
-func (l *lvtemplate) initPrivate() {
+//# mark Template init	----------------------------------------------------------------------------------------------------
+
+/**
+ *	init private
+ */
+func (l *Template) initPrivate() {
 	l.funcMap = make(template.FuncMap)
 	l.funcMap[kLVEmbedTempate] = l.embedTempate
 	l.funcMap[kLVStringToHtml] = l.stringToHtml
@@ -159,39 +115,90 @@ func (l *lvtemplate) initPrivate() {
 	l.goTemplate = template.New("LVTemplate")
 	l.baseDir = ""
 	l.isCompactHTML = true
+	l.leftDelims = "{{"
+	l.rightDelims = "}}"
 }
 
-func (l *lvtemplate) Get(tplPath string) *template.Template {
+//# mark Template private method ----------------------------------------------------------------------------------------------------
+
+/**
+ *	compact html
+ *
+ *	@param src
+ *	@param new replace string
+ */
+func (l *Template) compactHTML(src []byte) string {
+
+	if l.isCompactHTML {
+		// []byte{62, 60} = "><"
+		src = _rexTagExtSpace.ReplaceAll(src, []byte{62, 60})
+		src = _rexEmptyLineNode.ReplaceAll(src, []byte{})
+		//	[]byte{36, 123, 49, 125, 32} = "${1} "
+		src = _rexTagFirstSpace.ReplaceAll(src, []byte{36, 123, 49, 125, 32})
+		//	[]byte{36, 123, 49, 125} = "${1}"
+		src = _rexTagLastSpace.ReplaceAll(src, []byte{36, 123, 49, 125})
+		src = _rexSignSpace.ReplaceAll(src, []byte{36, 123, 49, 125})
+	}
+
+	return string(src)
+}
+
+//# mark Template publc method ----------------------------------------------------------------------------------------------------
+
+/**
+ *	get template by relateve path
+ *
+ *	@param tplPath template relative path
+ */
+func (l *Template) Get(tplPath string) *template.Template {
 	return l.goTemplate.Lookup(tplPath)
 }
 
-func (l *lvtemplate) Parse(tplPath string) (*template.Template, error) {
+/**
+ *	add cache template
+ *
+ *	@param name	unique name
+ *	@param src	template content, if empty by name lookup cache template
+ */
+func (t *Template) AddCacheTemplate(tplName, src string) error {
 
-	var tmpl *template.Template
+	tmpl := t.goTemplate.New(tplName)
+
+	if t.isCompactHTML {
+		src = t.compactHTML([]byte(src))
+	}
+
+	tmpl.Delims(t.leftDelims, t.rightDelims)
+	tmpl.Funcs(t.funcMap)
+	_, err := tmpl.Parse(src)
+
+	return err
+}
+
+/**
+ *	pares template by relative path
+ *
+ *	@param tplPath
+ *	@return *template.Template
+ *	@return error
+ */
+func (l *Template) Parse(tplPath string) (tmpl *template.Template, err error) {
+	//	process: golang template.New()->Funcs()->Parse()
+
 	if l.isCache {
 		if tmpl = l.goTemplate.Lookup(tplPath); nil != tmpl {
-			return tmpl, nil
+			return
 		}
 	}
 
 	if fullPath := l.TemplatePathAtName(tplPath); 0 < len(fullPath) {
+
 		read, err := ioutil.ReadFile(fullPath)
 		if nil != err {
 			return nil, err
 		}
 
-		if l.isCompactHTML {
-			// []byte{62, 60} = "><"
-			read = _rexTagExtSpace.ReplaceAll(read, []byte{62, 60})
-			read = _rexEmptyLineNode.ReplaceAll(read, []byte{})
-			//	[]byte{36, 123, 49, 125, 32} = "${1} "
-			read = _rexTagFirstSpace.ReplaceAll(read, []byte{36, 123, 49, 125, 32})
-			//	[]byte{36, 123, 49, 125} = "${1}"
-			read = _rexTagLastSpace.ReplaceAll(read, []byte{36, 123, 49, 125})
-			read = _rexSignSpace.ReplaceAll(read, []byte{36, 123, 49, 125})
-		}
-
-		tplString := string(read)
+		tplString := l.compactHTML(read)
 
 		if l.isCache {
 			tmpl = l.goTemplate.New(tplPath)
@@ -199,65 +206,105 @@ func (l *lvtemplate) Parse(tplPath string) (*template.Template, error) {
 			tmpl = template.New(tplPath)
 		}
 
+		tmpl.Delims(l.leftDelims, l.rightDelims)
 		tmpl.Funcs(l.funcMap)
-		if _, err := tmpl.Parse(tplString); nil != err {
-			return nil, err
+		if _, err = tmpl.Parse(tplString); nil != err {
+			tmpl = nil
 		}
-		return tmpl, nil
+
 	} else {
-		return nil, errors.New("can not find :" + tplPath)
+		err = errors.New("can not find :" + tplPath)
 	}
 
+	return
 }
 
-func (l *lvtemplate) ParseString(name, src string) (*template.Template, error) {
-	var tmpl *template.Template
+/**
+ *	parse template string, not template path
+ *
+ *	@param name	unique name
+ *	@param src	template content, if empty by name lookup cache template
+ *	@return *template.Template
+ *	@return error
+ */
+func (l *Template) ParseString(name, src string) (tmpl *template.Template, err error) {
 
 	if l.isCache {
 		if tmpl = l.goTemplate.Lookup(name); nil != tmpl {
-			return tmpl, nil
+			//	TODO 考虑如果tmpl.Parse(src)失败后，Lookup还会查询得到模版，但是永远都解析不了，这时该如何处理。
+			//	查看源码Execute()时会用 escaped 参数来控制，但是是内部访问，外部访问不了，目前暂时处理不了，保留。
+			return
+		} else {
+			tmpl = l.goTemplate.New(name)
 		}
-		tmpl = l.goTemplate.New(name)
 	} else {
 		tmpl = template.New(name)
 	}
 
 	if l.isCompactHTML {
-		read := []byte(src)
-
-		// []byte{62, 60} = "><"
-		read = _rexTagExtSpace.ReplaceAll(read, []byte{62, 60})
-		read = _rexEmptyLineNode.ReplaceAll(read, []byte{})
-		//	[]byte{36, 123, 49, 125, 32} = "${1} "
-		read = _rexTagFirstSpace.ReplaceAll(read, []byte{36, 123, 49, 125, 32})
-		//	[]byte{36, 123, 49, 125} = "${1}"
-		read = _rexTagLastSpace.ReplaceAll(read, []byte{36, 123, 49, 125})
-		read = _rexSignSpace.ReplaceAll(read, []byte{36, 123, 49, 125})
-
-		src = string(read)
+		src = l.compactHTML([]byte(src))
 	}
 
+	tmpl.Delims(l.leftDelims, l.rightDelims)
 	tmpl.Funcs(l.funcMap)
-	if _, err := tmpl.Parse(src); nil != err {
-		return nil, err
+	if _, err = tmpl.Parse(src); nil != err {
+		tmpl = nil
 	}
-	return tmpl, nil
 
+	return
 }
 
-func (l *lvtemplate) Execute(wr io.Writer, value TemplateValue) error {
-	tmpl, err := l.Parse(value.TplPath)
-	if nil == err && nil != tmpl {
-		return tmpl.Execute(wr, value.Data)
+/**
+ *	execute template
+ *
+ *
+ *	@param wr
+ *	@param value
+ *	@return error
+ */
+func (l *Template) Execute(wr io.Writer, value TemplateValue) error {
+	var resultErr error
+	//	TODO 待整改
+
+	tplName := value.TplName
+	tplPath := value.TplPath
+
+	if 0 != len(tplName) {
+		//	模版名称查询缓存模版
+		if tmpl := l.goTemplate.Lookup(tplName); nil != tmpl {
+			resultErr = tmpl.Execute(wr, value.Data)
+		} else {
+			resultErr = errors.New("\"" + tplName + "\" name not found template.")
+		}
+
+	} else if 0 != len(tplPath) {
+		//	模版路径解析模版
+		var tmpl *template.Template = nil
+
+		tmpl, resultErr = l.Parse(tplPath)
+
+		if nil == resultErr && nil != tmpl {
+			resultErr = tmpl.Execute(wr, value.Data)
+		} else if nil == resultErr {
+			resultErr = errors.New(tplPath + " template parse error.")
+		}
+
 	} else {
-		return err
+		resultErr = errors.New("TemplateValue tplName or tplPath is nil(len == 0)")
 	}
+
+	return resultErr
 }
 
-func (l *lvtemplate) TemplatePathAtName(tplName string) string {
+/**
+ *	template name join full path
+ *
+ *	@param tplName
+ *	@return not find is ""
+ */
+func (l *Template) TemplatePathAtName(tplName string) string {
 	var fullPath string
 
-	//	TODO 待整改Join，自己拼接还快几倍
 	if 0 < len(l.baseDir) {
 		fullPath = path.Join(l.baseDir, tplName)
 	} else {
@@ -271,19 +318,36 @@ func (l *lvtemplate) TemplatePathAtName(tplName string) string {
 	return ""
 }
 
-func (l *lvtemplate) SetFunc(key string, methodFunc interface{}) {
+/**
+ *	set template func
+ *
+ *	default func see lv_tempate_func.go
+ *		"LVEmbedTempate" LVTemplate.EmbedTempate	//嵌入模板函数
+ *
+ *	@param key
+ *	@param methodFunc
+ */
+func (l *Template) SetFunc(key string, methodFunc interface{}) {
 	l.rwmutex.Lock()
 	defer l.rwmutex.Unlock()
 	l.funcMap[key] = methodFunc
 }
 
-func (l *lvtemplate) DelFunc(key string) {
+/**
+ *	delete template func
+ *
+ *	@param key
+ */
+func (l *Template) DelFunc(key string) {
 	l.rwmutex.Lock()
 	defer l.rwmutex.Unlock()
 	delete(l.funcMap, key)
 }
 
-func (l *lvtemplate) DelAllFunc() {
+/**
+ *	delete all template func
+ */
+func (l *Template) DelAllFunc() {
 	l.rwmutex.Lock()
 	defer l.rwmutex.Unlock()
 
@@ -292,23 +356,63 @@ func (l *lvtemplate) DelAllFunc() {
 	}
 }
 
-func (l *lvtemplate) SetBaseDir(path string) {
+/**
+ *	set template base directory path
+ *	设置模板查询主目录,默认"".
+ *	主目录空的话就会按照编译文件所在目录开始查询模板
+ *
+ *	@param path	full path
+ */
+func (l *Template) SetBaseDir(path string) {
 	l.baseDir = path
 }
-func (l *lvtemplate) BaseDir() string {
+
+/**
+ *	get template base path
+ */
+func (l *Template) BaseDir() string {
 	return l.baseDir
 }
 
-func (l *lvtemplate) SetCompactHTML(compact bool) {
+/**
+ *	set template content html format compact
+ *	default true
+ */
+func (l *Template) SetCompactHTML(compact bool) {
 	l.isCompactHTML = compact
 }
-func (l *lvtemplate) IsCompactHTML() bool {
+
+/**
+ *	template format compact
+ */
+func (l *Template) IsCompactHTML() bool {
 	return l.isCompactHTML
 }
 
-func (l *lvtemplate) SetCache(cache bool) {
+/**
+ *	set template is cache
+ *	default false
+ *
+ *	@param cache
+ */
+func (l *Template) SetCache(cache bool) {
 	l.isCache = cache
 }
-func (l *lvtemplate) IsCache() bool {
+
+/**
+ *	template cache
+ */
+func (l *Template) IsCache() bool {
 	return l.isCache
+}
+
+/**
+ *	set the action delimiters left default {{ }}
+ *
+ *	@param left
+ *	@param right
+ */
+func (t *Template) SetDelims(left, right string) {
+	t.leftDelims = left
+	t.rightDelims = right
 }

@@ -95,11 +95,11 @@ func BodyByte(content []byte, contentType string, headers map[string]string) Byt
  *	@return TemplateValue
  */
 func BodyTemplate(data interface{}) LVTemplate.TemplateValue {
-	return LVTemplate.NewTemplateValueByData(data)
+	return LVTemplate.NewTemplateValue("", data)
 }
 
 /**
- *	by template out html, text/html
+ *	by template out content
  *	custom template path: (templateDir)/(tplPath).tpl
  *	e.g.: tplPath = "custom/base.tpl"
  *	templatePath  = (templateDir)/custom/base.tpl
@@ -110,6 +110,17 @@ func BodyTemplate(data interface{}) LVTemplate.TemplateValue {
  */
 func BodyTemplateByTplPath(tplPath string, data interface{}) LVTemplate.TemplateValue {
 	return LVTemplate.NewTemplateValue(tplPath, data)
+}
+
+/**
+ *	by cache template name out content
+ *
+ *	@param tplName
+ *	@param data
+ *	@return TemplateValue
+ */
+func BodyTemplateByTplName(tplName string, data interface{}) LVTemplate.TemplateValue {
+	return LVTemplate.NewTemplateValueByName(tplName, data)
 }
 
 /**

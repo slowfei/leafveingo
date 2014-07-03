@@ -157,8 +157,8 @@ func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOp
 		funcName, statusCode, err = router.ParseFuncName(context, option)
 	}
 
-	logInfo := "controller info" + dispstr + ": " + router.Info() + "\n"
-	logInfo += "func name: [" + funcName + "]" + "\n"
+	logInfo := "controller info" + dispstr + ": " + router.Info()
+	logInfo += "func name: [" + funcName + "]"
 	context.lvServer.log.Info(logInfo)
 
 	if Status200 != statusCode || nil != err {
@@ -240,15 +240,19 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 		}
 
 	case LVTemplate.TemplateValue:
-
+		//	TODO 解决模板自定义Content-Type
 		context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.Charset())
-		if 0 == len(cvt.TplPath) {
-			cvt.TplPath = router.ParseTemplatePath(context, funcName, option)
-		}
 
-		if 0 == len(cvt.TplPath) {
-			statusCode = Status500
-			panic(ErrTemplatePathParseNil)
+		tplPath := cvt.TplPath
+		tplName := cvt.TplName
+
+		if 0 == len(tplPath) && 0 == len(tplName) {
+			cvt.TplPath = router.ParseTemplatePath(context, funcName, option)
+
+			if 0 == len(cvt.TplPath) {
+				statusCode = Status500
+				panic(ErrTemplatePathParseNil)
+			}
 		}
 
 		lv.log.Info("access template path: \"" + cvt.TplPath + "\"")

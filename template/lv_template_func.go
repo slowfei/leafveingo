@@ -29,7 +29,7 @@ import (
 //	嵌入模板函数
 //	@tplPath	模板的相对路径
 //	@data		需要传递的数据
-func (l *lvtemplate) embedTempate(tplPath string, data interface{}) template.HTML {
+func (l *Template) embedTempate(tplPath string, data interface{}) template.HTML {
 
 	tmpl, err := l.Parse(tplPath)
 	if nil != tmpl {
@@ -47,7 +47,7 @@ func (l *lvtemplate) embedTempate(tplPath string, data interface{}) template.HTM
 //	string转换成html标签代码
 //	@str
 //	@return
-func (l *lvtemplate) stringToHtml(str string) template.HTML {
+func (l *Template) stringToHtml(str string) template.HTML {
 	return template.HTML(str)
 }
 
@@ -56,7 +56,7 @@ func (l *lvtemplate) stringToHtml(str string) template.HTML {
 //	slice值的添加："array" "value1,value2,value3"
 //	@mergerMap 需要合并的map
 //	@strs	   根据key value的顺序进行添加
-func (l *lvtemplate) mapPack(mergerMap map[string]interface{}, strs ...string) map[string]interface{} {
+func (l *Template) mapPack(mergerMap map[string]interface{}, strs ...string) map[string]interface{} {
 	var thisMap map[string]interface{} = nil
 
 	// TODO考虑是否需要验证mergerMap的类型
