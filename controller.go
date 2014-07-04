@@ -238,8 +238,14 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 		}
 
 	case LVTemplate.TemplateValue:
-		//	TODO 解决模板自定义Content-Type
-		context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.Charset())
+
+		contentType := cvt.ContentType
+
+		if 0 != len(contentType) {
+			context.RespWrite.Header().Set("Content-Type", contentType)
+		} else {
+			context.RespWrite.Header().Set("Content-Type", "text/html; charset="+lv.Charset())
+		}
 
 		tplPath := cvt.TplPath
 		tplName := cvt.TplName

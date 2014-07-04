@@ -62,9 +62,10 @@ var (
 
 //	模板数据，用于封装使用模板的数据传递
 type TemplateValue struct {
-	TplName string      //	template name precedence handle
-	TplPath string      //	template relative path
-	Data    interface{} //	bind data
+	TplName     string      //	template name precedence handle
+	TplPath     string      //	template relative path
+	ContentType string      //	response header Content-Type
+	Data        interface{} //	bind data
 }
 
 // 获取模板对象
