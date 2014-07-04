@@ -49,6 +49,7 @@ const (
 </html>`
 
 	Status301Msg = "Moved Permanently"
+	Status302Msg = "Moved Temporarily"
 	Status307Msg = "Temporary Redirect"
 	Status400Msg = "Bad Request"
 	Status403Msg = "Forbidden The server understood the request"
@@ -62,6 +63,7 @@ var (
 	//	http://zh.wikipedia.org/wiki/HTTP%E7%8A%B6%E6%80%81%E7%A0%81
 	Status200 = HttpStatus(200)
 	Status301 = HttpStatus(301)
+	Status302 = HttpStatus(302)
 	Status307 = HttpStatus(307)
 	Status400 = HttpStatus(400)
 	Status403 = HttpStatus(403)
@@ -105,6 +107,8 @@ func StatusMsg(status HttpStatus) string {
 		msg = "ok"
 	case Status301:
 		msg = Status301Msg
+	case Status302:
+		msg = Status302Msg
 	case Status307:
 		msg = Status307Msg
 	case Status400:
@@ -134,6 +138,8 @@ func StatusCodeToString(status HttpStatus) string {
 		msg = "200"
 	case Status301:
 		msg = "301"
+	case Status302:
+		msg = "302"
 	case Status307:
 		msg = "307"
 	case Status400:

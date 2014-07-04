@@ -267,8 +267,8 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 	case Redirect:
 
 		context.RespWrite.Header().Del("Content-Encoding")
-		http.Redirect(context.RespWrite, context.Request, string(cvt), int(Status301))
-		statusCode = Status301
+		http.Redirect(context.RespWrite, context.Request, cvt.URLPath, int(cvt.Code))
+		statusCode = cvt.Code
 
 	case Dispatcher:
 

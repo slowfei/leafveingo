@@ -39,7 +39,10 @@ type ByteOut struct {
 type HtmlOut string
 
 //	redirect url
-type Redirect string
+type Redirect struct {
+	URLPath string
+	Code    HttpStatus
+}
 
 //	body out file to path
 type ServeFilePath string
@@ -126,11 +129,24 @@ func BodyTemplateByTplName(tplName string, data interface{}) LVTemplate.Template
 /**
  *	redirect url
  *
+ *	status code default 302
+ *
  *	@param url
  *	@return Redirect
  */
 func BodyRedirect(url string) Redirect {
-	return Redirect(url)
+	return Redirect{url, Status302}
+}
+
+/**
+ *	redirect url by status code
+ *
+ *	@param url
+ *	@param code
+ *	@return Redirect
+ */
+func BodyRedirectByStatusCode(url string, code HttpStatus) Redirect {
+	return Redirect{url, code}
 }
 
 /**
