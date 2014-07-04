@@ -467,7 +467,7 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 
 	for _, element := range lv.routerList {
 		for key, value := range element.routers {
-			*logInfo += fmt.Sprintf("[%#v][%#v] %v\n", element.host, key, value.Info())
+			*logInfo += fmt.Sprintf("host:[%#v] key:[%#v] %v\n", element.host, key, value.Info())
 		}
 	}
 

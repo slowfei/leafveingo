@@ -171,7 +171,8 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
 		strBeforeAfter = "(Implemented BeforeAfterController)"
 	}
 
-	refType := refRouter.ctlRefVal.Type()
+	//	使用指针类型获取所有函数，否则非指针结构获取的只能是非指针的函数
+	refType := reflect.New(reflect.Indirect(refRouter.ctlRefVal).Type()).Type()
 	for i := 0; i < refType.NumMethod(); i++ {
 		refMet := refType.Method(i)
 		funcName := refMet.Name
@@ -180,7 +181,7 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
 		}
 	}
 	refRouter.typestr = refType.String()
-	refRouter.info = fmt.Sprintf("ReflectRouter(%v) router: %#v  %v%v", refType, routerKey, strBeforeAfter, strAde)
+	refRouter.info = fmt.Sprintf("ReflectRouter(%v) %v%v \nFuncNames: %v", refType, strBeforeAfter, strAde, refRouter.checkFuncName)
 
 	return refRouter
 }

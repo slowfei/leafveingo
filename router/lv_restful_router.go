@@ -220,7 +220,7 @@ func CreateRESTfulControllerWithOption(routerKey string, controller RESTfulContr
 		strBeforeAfter = "(Implemented BeforeAfterController)"
 	}
 
-	router.info = fmt.Sprintf("RESTfulRouter(%v) router: %#v  %v%v", refType, routerKey, strBeforeAfter, strAde)
+	router.info = fmt.Sprintf("RESTfulRouter(%v) %v%v", refType, strBeforeAfter, strAde)
 
 	return router
 }
