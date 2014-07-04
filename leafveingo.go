@@ -722,6 +722,17 @@ func (lv *LeafveinServer) AddRouter(router IRouter) {
 }
 
 /**
+ *	add cache template
+ *
+ *	@param tplName	template unique name
+ *	@param src		template content
+ *	@return error info
+ */
+func (lv *LeafveinServer) AddCacheTemplate(tplName, src string) error {
+	return lv.template.AddCacheTemplate(tplName, src)
+}
+
+/**
  *	developer mode
  *
  *	@return true is developer mode
