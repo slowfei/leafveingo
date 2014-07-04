@@ -153,8 +153,8 @@ type ServerOption struct {
 /**
  *	default server option value
  */
-func DefaultOption() *ServerOption {
-	option := &ServerOption{}
+func DefaultOption() ServerOption {
+	option := ServerOption{}
 	option.addr = "127.0.0.1"
 	option.port = 8080
 	option.smgcTime = LVSession.DEFAULT_SCAN_GC_TIME
@@ -165,7 +165,7 @@ func DefaultOption() *ServerOption {
 /**
  *	set addr
  */
-func (s *ServerOption) SetAddr(addr string) *ServerOption {
+func (s ServerOption) SetAddr(addr string) ServerOption {
 	s.addr = addr
 	return s
 }
@@ -173,7 +173,7 @@ func (s *ServerOption) SetAddr(addr string) *ServerOption {
 /**
  *	set port
  */
-func (s *ServerOption) SetPort(port int) *ServerOption {
+func (s ServerOption) SetPort(port int) ServerOption {
 	s.port = port
 	return s
 }
@@ -181,7 +181,7 @@ func (s *ServerOption) SetPort(port int) *ServerOption {
 /**
  *	set session manager operate gc
  */
-func (s *ServerOption) SetSMGCTime(second int64) *ServerOption {
+func (s ServerOption) SetSMGCTime(second int64) ServerOption {
 	s.smgcTime = second
 	return s
 }
@@ -189,7 +189,7 @@ func (s *ServerOption) SetSMGCTime(second int64) *ServerOption {
 /**
  *	set config file path
  */
-func (s *ServerOption) SetConfigPath(path string) *ServerOption {
+func (s ServerOption) SetConfigPath(path string) ServerOption {
 	s.configPath = path
 	return s
 }
@@ -197,7 +197,7 @@ func (s *ServerOption) SetConfigPath(path string) *ServerOption {
 /**
  *	checked params
  */
-func (s *ServerOption) checked() {
+func (s *ServerOption) Checked() {
 	if 60 > s.smgcTime {
 		s.smgcTime = 60
 	}
@@ -276,7 +276,7 @@ func NewLeafveinServer(appName string, option ServerOption) *LeafveinServer {
 	if 0 == len(appName) {
 		return nil
 	}
-	option.checked()
+	option.Checked()
 
 	server := &LeafveinServer{appName: appName, addr: option.addr, port: option.port}
 

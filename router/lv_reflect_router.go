@@ -54,7 +54,7 @@ func DefaultReflectRouterOption() ReflectRouterOption {
  *	set scheme
  *	"http" || "https" || ""(wildcard)
  */
-func (o *ReflectRouterOption) SetScheme(scheme string) *ReflectRouterOption {
+func (o ReflectRouterOption) SetScheme(scheme string) ReflectRouterOption {
 	o.ControllerOption.SetScheme(scheme)
 	return o
 }
@@ -63,7 +63,7 @@ func (o *ReflectRouterOption) SetScheme(scheme string) *ReflectRouterOption {
  *	set host
  *	"svn.slowfei.com" || "wwww.slowfei.com" || ""(wildcard)
  */
-func (o *ReflectRouterOption) SetHost(host string) *ReflectRouterOption {
+func (o ReflectRouterOption) SetHost(host string) ReflectRouterOption {
 	o.ControllerOption.SetHost(host)
 	return o
 }

@@ -57,9 +57,8 @@ func (c ControllerOption) Scheme() string {
  *	set scheme
  *	"http" || "https" || ""(wildcard)
  */
-func (c *ControllerOption) SetScheme(scheme string) *ControllerOption {
+func (c *ControllerOption) SetScheme(scheme string) {
 	c.scheme = scheme
-	return c
 }
 
 /**
@@ -75,9 +74,8 @@ func (c ControllerOption) Host() string {
  *	set host
  *	"svn.slowfei.com" || "wwww.slowfei.com" || ""(wildcard)
  */
-func (c *ControllerOption) SetHost(host string) *ControllerOption {
+func (c *ControllerOption) SetHost(host string) {
 	c.host = host
-	return c
 }
 
 /**

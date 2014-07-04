@@ -110,7 +110,7 @@ func DefaultRESTfulRouterOption() RESTfulRouterOption {
  *	set scheme
  *	"http" || "https" || ""(wildcard)
  */
-func (o *RESTfulRouterOption) SetScheme(scheme string) *RESTfulRouterOption {
+func (o RESTfulRouterOption) SetScheme(scheme string) RESTfulRouterOption {
 	o.ControllerOption.SetScheme(scheme)
 	return o
 }
@@ -119,7 +119,7 @@ func (o *RESTfulRouterOption) SetScheme(scheme string) *RESTfulRouterOption {
  *	set host
  *	"svn.slowfei.com" || "wwww.slowfei.com" || ""(wildcard)
  */
-func (o *RESTfulRouterOption) SetHost(host string) *RESTfulRouterOption {
+func (o RESTfulRouterOption) SetHost(host string) RESTfulRouterOption {
 	o.ControllerOption.SetHost(host)
 	return o
 }
