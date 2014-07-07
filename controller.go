@@ -155,7 +155,7 @@ func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOp
 		funcName, statusCode, err = router.ParseFuncName(context, option)
 	}
 
-	logInfo := "controller info" + dispstr + ": " + router.Info()
+	logInfo := "controller info" + dispstr + ": " + router.Info() + "\n"
 	logInfo += "func name: [" + funcName + "]"
 	context.lvServer.log.Info(logInfo)
 

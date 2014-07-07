@@ -181,7 +181,7 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
 		}
 	}
 	refRouter.typestr = refType.String()
-	refRouter.info = fmt.Sprintf("ReflectRouter(%v) %v%v \nFuncNames: %v", refType, strBeforeAfter, strAde, refRouter.checkFuncName)
+	refRouter.info = fmt.Sprintf("ReflectRouter(%v) %v%v", refType, strBeforeAfter, strAde)
 
 	return refRouter
 }
