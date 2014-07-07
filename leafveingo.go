@@ -143,11 +143,11 @@ type ServerOption struct {
 	// 	all address access
 	//  "192.168.?.?" 	specify access
 	//	default "127.0.0.1"
-	addr string
+	Addr string
 
-	port       int    // ip port. default 8080
-	smgcTime   int64  // session manager gc operate time. 0 is not run session, minimum 60 second. default 300
-	configPath string // config file path, can set empty. default ""
+	Port       int    // ip port. default 8080
+	SMGCTime   int64  // session manager gc operate time. 0 is not run session, minimum 60 second. default 300
+	ConfigPath string // config file path, can set empty. default ""
 }
 
 /**
@@ -155,10 +155,10 @@ type ServerOption struct {
  */
 func DefaultOption() ServerOption {
 	option := ServerOption{}
-	option.addr = "127.0.0.1"
-	option.port = 8080
-	option.smgcTime = LVSession.DEFAULT_SCAN_GC_TIME
-	option.configPath = ""
+	option.Addr = "127.0.0.1"
+	option.Port = 8080
+	option.SMGCTime = LVSession.DEFAULT_SCAN_GC_TIME
+	option.ConfigPath = ""
 	return option
 }
 
@@ -166,7 +166,7 @@ func DefaultOption() ServerOption {
  *	set addr
  */
 func (s ServerOption) SetAddr(addr string) ServerOption {
-	s.addr = addr
+	s.Addr = addr
 	return s
 }
 
@@ -174,7 +174,7 @@ func (s ServerOption) SetAddr(addr string) ServerOption {
  *	set port
  */
 func (s ServerOption) SetPort(port int) ServerOption {
-	s.port = port
+	s.Port = port
 	return s
 }
 
@@ -182,7 +182,7 @@ func (s ServerOption) SetPort(port int) ServerOption {
  *	set session manager operate gc
  */
 func (s ServerOption) SetSMGCTime(second int64) ServerOption {
-	s.smgcTime = second
+	s.SMGCTime = second
 	return s
 }
 
@@ -190,7 +190,7 @@ func (s ServerOption) SetSMGCTime(second int64) ServerOption {
  *	set config file path
  */
 func (s ServerOption) SetConfigPath(path string) ServerOption {
-	s.configPath = path
+	s.ConfigPath = path
 	return s
 }
 
@@ -198,8 +198,8 @@ func (s ServerOption) SetConfigPath(path string) ServerOption {
  *	checked params
  */
 func (s *ServerOption) Checked() {
-	if 60 > s.smgcTime {
-		s.smgcTime = 60
+	if 60 > s.SMGCTime {
+		s.SMGCTime = 60
 	}
 }
 
@@ -278,7 +278,7 @@ func NewLeafveinServer(appName string, option ServerOption) *LeafveinServer {
 	}
 	option.Checked()
 
-	server := &LeafveinServer{appName: appName, addr: option.addr, port: option.port}
+	server := &LeafveinServer{appName: appName, addr: option.Addr, port: option.Port}
 
 	//	set other params
 	server.initPrivate(option)
@@ -303,8 +303,8 @@ func (lv *LeafveinServer) initPrivate(option ServerOption) {
 	lv.configLoadDefault()
 
 	//	config handle
-	if 0 != len(option.configPath) {
-		config, err := configLoadByFilepath(option.configPath)
+	if 0 != len(option.ConfigPath) {
+		config, err := configLoadByFilepath(option.ConfigPath)
 		if nil != err {
 			lilcErr := *ErrLeafveinInitLoadConfig
 			lilcErr.UserInfo = err.Error()
@@ -320,8 +320,8 @@ func (lv *LeafveinServer) initPrivate(option ServerOption) {
 	lv.operatingDir = filepath.Join(SFFileManager.GetExecDir(), lv.appName)
 
 	//	start session manager
-	if 60 <= option.smgcTime {
-		lv.SetHttpSessionManager(LVSession.NewSessionManagerAtGCTime(option.smgcTime, true))
+	if 60 <= option.SMGCTime {
+		lv.SetHttpSessionManager(LVSession.NewSessionManagerAtGCTime(option.SMGCTime, true))
 	}
 
 }
@@ -1179,6 +1179,9 @@ func (lv *LeafveinServer) Log() *SFLog.SFLogger {
 
 /**
  *	ServeHTTP
+ *
+ *	@param rw
+ *	@param req
  */
 func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//	TODO 考虑是否加上读取锁，等测试性能后加上再测试看看。
