@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2014-07-04
+//  Update on 2014-07-08
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
@@ -466,8 +466,12 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 	*logInfo += "controller:\n"
 
 	for _, element := range lv.routerList {
-		for key, value := range element.routers {
-			*logInfo += fmt.Sprintf("host:[%#v] key:[%#v] %v\n", element.host, key, value.Info())
+		for _, key := range element.routerKeys {
+			if router, ok := element.routers[key]; ok {
+				*logInfo += fmt.Sprintf("host:[%#v] key:[%#v] %v\n", element.host, key, router.Info())
+			} else {
+				*logInfo += fmt.Sprintf("host:[%#v] key:[%#v] controller stores error.", element.host, key)
+			}
 		}
 	}
 
@@ -577,7 +581,7 @@ func (lv *LeafveinServer) deferServeHTTP(contextPrt **HttpContext, rw http.Respo
 		}
 
 		fmt.Fprintf(stackBuf, "\n-----------------------------\nleafveiongo version:%v \ngolang version: %v", Version(), runtime.Version())
-		lv.log.Error(stackBuf.String())
+		lv.log.Error("panic error.\nerror info: " + errStr + "\nstack:\n" + stackBuf.String())
 	}
 
 	if nil != context {
@@ -1293,7 +1297,11 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//	router parse
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)
 
-	lv.log.Info("request url path: [%s,%s,%d]%#v", option.RequestMethod, option.RouterKey, statusCode, reqPath)
+	if nil != option {
+		lv.log.Info("request url path: [%s,%s,%d]%#v %#v ", option.RequestMethod, option.RouterKey, statusCode, reqPath, option.RouterPath)
+	} else {
+		lv.log.Info("request url path: [%s,nil,%d]%#v ", req.Method, statusCode, reqPath)
+	}
 
 	errstr := ""
 	var err error = nil
