@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-16
-//  Update on 2014-07-02
+//  Update on 2014-07-08
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -155,9 +155,17 @@ func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOp
 		funcName, statusCode, err = router.ParseFuncName(context, option)
 	}
 
-	logInfo := "controller info" + dispstr + ": " + router.Info() + "\n"
-	logInfo += "func name: [" + funcName + "]"
-	context.lvServer.log.Info(logInfo)
+	//	parse form params
+	paramErr := context.parseForm()
+
+	if nil == paramErr {
+		context.lvServer.log.Info("request fileNum: %d; params: %v ", len(context.formparams.files), context.formparams.params)
+	} else {
+		context.lvServer.log.Info("request params(error):" + paramErr.Error())
+	}
+
+	//	controller info print
+	context.lvServer.log.Info("func name: [" + funcName + "] " + "controller info" + dispstr + ": " + router.Info())
 
 	if Status200 != statusCode || nil != err {
 		return
