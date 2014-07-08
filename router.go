@@ -217,7 +217,7 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 			keyCount := len(element.routerKeys)
 			for j := 0; j < keyCount; j++ {
 
-				key := element.routerKeys[i]
+				key := element.routerKeys[j]
 				keyLen := len(key)
 
 				if keyLen <= reqPathLen && key == lowerReqPath[:keyLen] {
