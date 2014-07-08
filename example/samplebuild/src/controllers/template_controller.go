@@ -13,9 +13,24 @@ type TemplateController struct {
 func (t *TemplateController) Index() interface{} {
 	params := make(map[string]interface{})
 	params["Content"] = "Hello Template Index"
+
+	// 模版默认路径
+	// lv_reflect_router.go 实现规则是[router key]/[func name].tpl
+	//		router key = "/admin/"
+	//			   URL = POST http://localhost:8080/admin/login
+	//		 func name = PostLogin
+	//	 template path = template/admin/PostLogin.tpl
+
+	// lv_restful_router.go	实现规则是[router key]/[func name].tpl
+	//		router key = "/api/object"
+	//			   URL = DELETE http://localhost:8080/api/object
+	//		 func name = delete
+	//	 template path = template/api/object/delete.tpl
+
+	//	当前请求URL http://localhost:8080/r/template
+	//    router key  = "/t/"
+	//	template path = template/r/template.tpl
 	//	对应的模板位置 github.com/slowfei/leafveingo/example/sample/SampleWeb/template/t/index.tpl
-	//	router key  = "/t/"
-	//	request url = http://localhost:8080/t/
 	return leafveingo.BodyTemplate(params)
 
 	//	另外一种模板加载方式

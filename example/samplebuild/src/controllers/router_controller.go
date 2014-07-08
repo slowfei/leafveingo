@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	_urlrexForum  = regexp.MustCompile(`^/[rR]outer/forum-([0-9]+)-([0-9]+)(\.\w+)?$`)
-	_urlrexThread = regexp.MustCompile(`^/[rR]outer/thread-(?P<bid>[0-9]+)-(?P<tid>[0-9]+)-(?P<pid>[0-9]+)$`)
-	_urlrexSpace  = regexp.MustCompile(`^/[rR]outer/space/(username|uid)/(.+)/$`)
-	_urlrexMD5    = regexp.MustCompile(`^/[rR]outer/[0-9a-zA-Z]{32}$`)
+	_urlrexForum  = regexp.MustCompile(`^forum-([0-9]+)-([0-9]+)(\.\w+)?$`)
+	_urlrexThread = regexp.MustCompile(`^thread-(?P<bid>[0-9]+)-(?P<tid>[0-9]+)-(?P<pid>[0-9]+)$`)
+	_urlrexSpace  = regexp.MustCompile(`^space/(username|uid)/(.+)/$`)
+	_urlrexMD5    = regexp.MustCompile(`^[0-9a-zA-Z]{32}$`)
 )
 
 //	高级路由器演示控制器
@@ -23,14 +23,15 @@ type RouterController struct {
 //	http://localhost:8080/router/thread-([0-9]+)-([0-9]+)-([0-9]+)
 //	http://localhost:8080/router/space/(username|uid)/(.+)/
 //	http://localhost:8080/router/[0-9a-zA-Z]{32}
-func (arc RouterController) RouterMethodParse(requrl string) (methodName string, params map[string]string) {
+func (arc RouterController) RouterMethodParse(option *leafveingo.RouterOption) (funcName string, params map[string]string) {
 	//	下面演示几种正则的解析操作，聪明的您肯定会以最优的处理方式来返回所需要的函数名和参数。
+	requrl := option.RouterPath
 	switch {
 	case _urlrexForum.MatchString(requrl):
 		ps := _urlrexForum.FindStringSubmatch(requrl)
 		if 3 <= len(ps) {
 			params = map[string]string{"bid": ps[1], "tid": ps[2]}
-			methodName = "Forum"
+			funcName = "Forum"
 			return
 		}
 	case _urlrexThread.MatchString(requrl):
@@ -45,7 +46,7 @@ func (arc RouterController) RouterMethodParse(requrl string) (methodName string,
 			for i := 1; i < pCount; i++ {
 				params[names[i]] = ps[i]
 			}
-			methodName = "Thread"
+			funcName = "Thread"
 			return
 		}
 
@@ -53,12 +54,12 @@ func (arc RouterController) RouterMethodParse(requrl string) (methodName string,
 		ps := _urlrexSpace.FindStringSubmatch(requrl)
 		if 3 == len(ps) {
 			params = map[string]string{ps[1]: ps[2]}
-			methodName = "Space"
+			funcName = "Space"
 			return
 		}
 	case _urlrexMD5.MatchString(requrl):
-		params = map[string]string{"md5": requrl[len("/router/"):]}
-		methodName = "MD5"
+		params = map[string]string{"md5": requrl}
+		funcName = "MD5"
 		return
 	default:
 		fmt.Println("defalut")

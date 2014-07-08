@@ -9,7 +9,7 @@
 <body>
 	<h1>控制器接收参数</h1>
 	
-<a href="/p/param1.htm">http://localhost:8080/p/param1.htm</a>
+<a href="/p/param1">http://localhost:8080/p/param1</a>
 <br/>
 <pre>
 //	获取 *http.Request 和 http.ResponseWriter参数
@@ -19,7 +19,7 @@ func (p *ParamsController) Param1(request *http.Request, rw http.ResponseWriter)
 </pre>
 <br />
 
-<a href="/p/param2.htm">http://localhost:8080/p/param2.htm</a>
+<a href="/p/param2">http://localhost:8080/p/param2</a>
 <br/>
 <pre>
 //	获取session
@@ -29,7 +29,7 @@ func (p *ParamsController) Param2(session LVSession.HttpSession) string {
 </pre>
 <br />
 
-<a href="/p/param3.htm">http://localhost:8080/p/param3.htm</a>
+<a href="/p/param3">http://localhost:8080/p/param3</a>
 <br/>
 <pre>
 //	获取上下文HttpContext
@@ -39,8 +39,8 @@ func (p *ParamsController) Param3(context *leafveingo.HttpContext) string {
 </pre>
 <br />
 
-<a href="/p/param4.htm?id=1&name=slowfei">http://localhost:8080/p/param4.htm?id=1&name=slowfei</a>
-<a href="/p/param5.htm?id=1&name=slowfei">http://localhost:8080/p/param5.htm?id=1&name=slowfei</a>
+<a href="/p/param4?id=1&name=slowfei">http://localhost:8080/p/param4?id=1&name=slowfei</a>
+<a href="/p/param5?id=1&name=slowfei">http://localhost:8080/p/param5?id=1&name=slowfei</a>
 <br/>
 <pre>
 //	参数结构的封装
@@ -59,7 +59,7 @@ func (p *ParamsController) Param5(params UserInfo) string {
 
 
 
-<a href="/p/param6.htm">http://localhost:8080/p/param6.htm</a>
+<a href="/p/param6">http://localhost:8080/p/param6</a>
 <br/>
 <pre>
 /******* 嵌套参数结构封装 *******/
@@ -91,7 +91,7 @@ func (p *ParamsController) PostParam6(params User) string {
 <br />
 
 
-<a href="/p/param7.htm">http://localhost:8080/p/param7.htm</a>
+<a href="/p/param7">http://localhost:8080/p/param7</a>
 <br/>
 <pre>
 /******* 数组集合参数封装 ********/

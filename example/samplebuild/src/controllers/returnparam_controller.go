@@ -69,8 +69,21 @@ func (r *ReturnParamController) Template(params struct {
 	if params.T == 1 {
 		return leafveingo.BodyTemplateByTplPath("custom/custom.tpl", params.Info)
 	} else {
-		// 模板默认路径，根据router key 命名文件夹然后函数名指定模板名称
-		// github.com/slowfei/leafveingo/example/sample/SampleWeb/template/r/template.tpl
+		// 模版默认路径
+		// lv_reflect_router.go 实现规则是[router key]/[func name].tpl
+		//		router key = "/admin/"
+		//			   URL = POST http://localhost:8080/admin/login
+		//		 func name = PostLogin
+		//	 template path = template/admin/PostLogin.tpl
+
+		// lv_restful_router.go	实现规则是[router key]/[func name].tpl
+		//		router key = "/api/object"
+		//			   URL = DELETE http://localhost:8080/api/object
+		//		 func name = delete
+		//	 template path = template/api/object/delete.tpl
+
+		//	当前请求URL http://localhost:8080/r/template
+		//	template path = template/r/template.tpl
 		return leafveingo.BodyTemplate(params.Info)
 	}
 
@@ -89,7 +102,7 @@ func (r *ReturnParamController) Redirect(params struct {
 				<title>Redirect</title>
 			</head>
 			<body>
-				<a href="/r/redirect.htm?url=http://www.google.com">Redirect to google</a>
+				<a href="/r/redirect?url=https://github.com/slowfei">Redirect to github.com/slowfei</a>
 			</body>
 			</html>
 			`)
@@ -103,7 +116,7 @@ func (r *ReturnParamController) Dispatcher(params struct {
 	Info string
 }) interface{} {
 	//	注意router key，对应添加控制器router
-	return leafveingo.BodyCellController("/r/", "DispTest")
+	return leafveingo.BodyCallController("/r/", "DispTest")
 }
 func (r *ReturnParamController) DispTest(params struct {
 	Info string

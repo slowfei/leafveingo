@@ -2,37 +2,48 @@ package controller
 
 import (
 	"fmt"
-	"net/http"
+	lv "github.com/slowfei/leafveingo"
 )
 
 //	before after 演示控制器
+//	需要实现 lv.BeforeAfterController 控制器Before(...)和After(...)函数
 type BeforeAfterController struct {
 	tag string
 }
 
-//	before
-//	可接收的参数：*http.Request、*url.URL、
-//				*leafveingo.HttpContext、[]uint8(Request.Body)
-//				http.ResponseWriter、LVSession.HttpSession
-//	@return bool 返回true 可继续访问请求的函数， false 则跳转403错误页面; 默认可以设置返回值等于true
-func (ba *BeforeAfterController) Before(req *http.Request, rw http.ResponseWriter) bool {
+/**
+ *	before
+ *
+ *	@param context	固定参数
+ *	@param option	固定参数
+ *	@return			根据需求放回状态代码，200通过，其他将会跳转相应的状态页面，也可以返回lv.StatusNil自行响应输出。
+ */
+func (ba *BeforeAfterController) Before(context *lv.HttpContext, option *lv.RouterOption) lv.HttpStatus {
+
+	fmt.Printf("BeforeAfterController(%p) Before(...)\n", ba)
 	//	这里会根据请求验证密码，对了才能进入所请求的函数。
-	if "123456" == req.URL.Query().Get("pwd") {
-		return true
+	if "123456" == context.Request.URL.Query().Get("pwd") {
+		return lv.Status200
 	} else {
-		return false
+		return lv.Status403
 	}
 }
 
-// index
+/**
+ *	index
+ */
 func (ba *BeforeAfterController) Index() string {
+	fmt.Printf("BeforeAfterController(%p) Index()\n", ba)
+
 	return "Wish you a successful visit!"
 }
 
-//	after
-//	可接收的参数：*http.Request、*url.URL、
-//				*leafveingo.HttpContext、[]uint8(Request.Body)
-//				http.ResponseWriter、LVSession.HttpSession
-func (ba *BeforeAfterController) After(req *http.Request) {
-	fmt.Printf("request end (%v) \n", req.URL.String())
+/**
+ *	after
+ *
+ *	@param context	固定参数
+ *	@param option	固定参数
+ */
+func (ba *BeforeAfterController) After(context *lv.HttpContext, option *lv.RouterOption) {
+	fmt.Printf("BeforeAfterController(%p) After(...) %v\n", ba, context.Request.URL.String())
 }

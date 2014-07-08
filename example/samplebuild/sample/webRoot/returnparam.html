@@ -9,7 +9,7 @@
 <body>
 	<h1>控制器返回参数演示</h1>
 	
-<a href="/r/text.htm">http://localhost:8080/r/text.htm</a>
+<a href="/r/text">http://localhost:8080/r/text</a>
 <br/>
 <pre>
 //	输出 text, Content-Type = text/plain
@@ -20,7 +20,7 @@ func (r *ReturnParamController) Text() string {
 </pre>
 <br/>
 
-<a href="/r/html.htm">http://localhost:8080/r/html.htm</a>
+<a href="/r/html">http://localhost:8080/r/html</a>
 <br/>
 <pre>
 // 输出text html, Content-Type = text/plain
@@ -33,7 +33,7 @@ func (r *ReturnParamController) Html() leafveingo.HtmlOut {
 </pre>
 <br/>
 
-<a href="/r/json.htm">http://localhost:8080/r/json.htm</a>
+<a href="/r/json">http://localhost:8080/r/json</a>
 <br/>
 <pre>
 //	输出json Content-Type = application/json
@@ -64,7 +64,7 @@ func (r *ReturnParamController) Json(params struct {
 </pre>
 <br/>
 
-<a href="/r/byte.htm">http://localhost:8080/r/byte.htm</a>
+<a href="/r/byte">http://localhost:8080/r/byte</a>
 <br/>
 <pre>
 //	输出 []byte
@@ -75,7 +75,7 @@ func (r *ReturnParamController) Byte() leafveingo.ByteOut {
 <br/>
 
 
-<a href="/r/template.htm">http://localhost:8080/r/template.htm</a>
+<a href="/r/template">http://localhost:8080/r/template</a>
 <br/>
 <pre>
 //	输出模板
@@ -86,8 +86,21 @@ func (r *ReturnParamController) Template(params struct {
 	if params.T == 1 {
 		return leafveingo.BodyTemplateByTplPath("custom/custom.tpl", params.Info)
 	} else {
-		// 模板默认路径，根据router key 命名文件夹然后函数名指定模板名称
-		// github.com/slowfei/leafveingo/example/sample/SampleWeb/template/r/template.tpl
+		// 模版默认路径
+		// lv_reflect_router.go 实现规则是[router key]/[func name].tpl
+		//		router key = "/admin/"
+		//			   URL = POST http://localhost:8080/admin/login
+		//		 func name = PostLogin
+		//	 template path = template/admin/PostLogin.tpl
+
+		// lv_restful_router.go	实现规则是[router key]/[func name].tpl
+		//		router key = "/api/object"
+		//			   URL = DELETE http://localhost:8080/api/object
+		//		 func name = delete
+		//	 template path = template/api/object/delete.tpl
+
+		//	当前请求URL http://localhost:8080/r/template
+		//	template path = template/r/template.tpl
 		return leafveingo.BodyTemplate(params.Info)
 	}
 
@@ -95,7 +108,7 @@ func (r *ReturnParamController) Template(params struct {
 </pre>
 <br/>
 
-<a href="/r/redirect.htm">http://localhost:8080/r/redirect.htm</a>
+<a href="/r/redirect">http://localhost:8080/r/redirect</a>
 <br/>
 <pre>
 //	重定向url
@@ -114,7 +127,7 @@ func (r *ReturnParamController) Redirect(params struct {
 <br/>
 
 
-<a href="/r/dispatcher.htm?info=slowfei">http://localhost:8080/r/dispatcher.htm?info=slowfei</a>
+<a href="/r/dispatcher?info=slowfei">http://localhost:8080/r/dispatcher?info=slowfei</a>
 <br/>
 <pre>
 //	控制器转发
@@ -133,7 +146,7 @@ func (r *ReturnParamController) DispTest(params struct {
 <br/>
 
 
-<a href="/r/file.htm">http://localhost:8080/r/file.htm</a>
+<a href="/r/file">http://localhost:8080/r/file</a>
 <br/>
 <pre>
 //	文件输出
