@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2014-06-16
-//  Update on 2014-07-02
+//  Update on 2014-07-08
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -115,20 +115,24 @@ func (o *ReflectRouterOption) Checked() {
 //
 //	控制器分的指针传递和值传递
 //		值传递：
-//		CreateReflectController("/home/", HomeController{})
-//		每次请求(http://localhost:8080/home/)时 controller 都会根据设置的控制器类型新建立一个对象进行处理
+//		CreateReflectController("/pointer/struct/", PointerController{})
+//		每次请求(http://localhost:8080/pointer/struct/) 都会根据设置的控制器类型新建立一个对象进行处理，直到一次请求周期结束。
 //
 //		指针传递：
-//		CreateReflectController("/admin/", &AdminController{})
+//		CreateReflectController("/pointer/", new(PointerController))
 //		跟值传递相反，每次请求时都会使用设置的控制器地址进行处理，应用结束也不会改变，每次请求控制器都不会改变内存地址
-//		这里涉及到并发时同时使用一个内存地址处理的问题，不过目前还没有弄到锁，并发后期会进行改进和处理。
+//		这里涉及到并发时同时使用一个内存地址处理的问题，使用时需要注意
 //
 type ReflectRouter struct {
-	routerKey       string                // router key
-	implBeforeAfter BeforeAfterController // implement interface
-	implAdeRouter   AdeRouterController   // implement interface
-	ctlRefVal       reflect.Value         // controller reflect value
-	checkFuncName   map[string]int        // check func name map
+	routerKey string // router key
+
+	beforeAfter   BeforeAfterController // implement interface
+	adeRouter     AdeRouterController   // implement interface
+	isBeforeAfter bool
+	isAdeRouter   bool
+
+	ctlRefVal     reflect.Value  // controller reflect value
+	checkFuncName map[string]int // check func name map
 
 	option  ReflectRouterOption
 	info    string
@@ -160,19 +164,32 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
 	refRouter.checkFuncName = make(map[string]int)
 	refRouter.ctlRefVal = reflect.ValueOf(controller)
 	refRouter.option = option
-
-	if refRouter.ctlRefVal.Type().Implements(RefTypeAdeRouterController) {
-		refRouter.implAdeRouter = controller.(AdeRouterController)
-		strAde = "(Implemented AdeRouterController)"
-	}
-
-	if refRouter.ctlRefVal.Type().Implements(RefTypeBeforeAfterController) {
-		refRouter.implBeforeAfter = controller.(BeforeAfterController)
-		strBeforeAfter = "(Implemented BeforeAfterController)"
-	}
+	refRouter.isAdeRouter = false
+	refRouter.isBeforeAfter = false
 
 	//	使用指针类型获取所有函数，否则非指针结构获取的只能是非指针的函数
 	refType := reflect.New(reflect.Indirect(refRouter.ctlRefVal).Type()).Type()
+
+	if refType.Implements(RefTypeAdeRouterController) {
+
+		if reflect.Ptr == refRouter.ctlRefVal.Kind() {
+			refRouter.adeRouter = controller.(AdeRouterController)
+		}
+
+		refRouter.isAdeRouter = true
+		strAde = "(Implemented AdeRouterController)"
+	}
+
+	if refType.Implements(RefTypeBeforeAfterController) {
+
+		if reflect.Ptr == refRouter.ctlRefVal.Kind() {
+			refRouter.beforeAfter = controller.(BeforeAfterController)
+		}
+
+		refRouter.isBeforeAfter = true
+		strBeforeAfter = "(Implemented BeforeAfterController)"
+	}
+
 	for i := 0; i < refType.NumMethod(); i++ {
 		refMet := refType.Method(i)
 		funcName := refMet.Name
@@ -180,8 +197,9 @@ func CreateReflectControllerWithOption(routerKey string, controller interface{},
 			refRouter.checkFuncName[funcName] = i
 		}
 	}
-	refRouter.typestr = refType.String()
-	refRouter.info = fmt.Sprintf("ReflectRouter(%v) %v%v", refType, strBeforeAfter, strAde)
+
+	refRouter.typestr = refRouter.ctlRefVal.Type().String()
+	refRouter.info = fmt.Sprintf("ReflectRouter(%v) %v%v", refRouter.ctlRefVal.Type(), strBeforeAfter, strAde)
 
 	return refRouter
 }
@@ -299,14 +317,16 @@ func (r *ReflectRouter) AfterRouterParse(context *HttpContext, option *RouterOpt
 func (r *ReflectRouter) ParseFuncName(context *HttpContext, option *RouterOption) (funcName string, statusCode HttpStatus, err error) {
 
 	/* 高级路由实现操作 */
-	if nil != r.implAdeRouter {
+	if r.isAdeRouter {
 		var params map[string]string = nil
 
 		if reflect.Invalid != option.RouterDataRefVal.Kind() {
+
 			adeRouter := option.RouterDataRefVal.Interface().(AdeRouterController)
 			funcName, params = adeRouter.RouterMethodParse(option)
-		} else {
-			funcName, params = r.implAdeRouter.RouterMethodParse(option)
+
+		} else if nil != r.adeRouter {
+			funcName, params = r.adeRouter.RouterMethodParse(option)
 		}
 
 		if 0 == len(funcName) {
@@ -374,11 +394,12 @@ func (r *ReflectRouter) ParseFuncName(context *HttpContext, option *RouterOption
 					c -= 'a' - 'A'
 				}
 			}
-			nameByte[writeIdx] = c
-			writeIdx++
 		} else {
 			isUpper = true
 		}
+
+		nameByte[writeIdx] = c
+		writeIdx++
 	}
 
 	if 0 != writeIdx {
@@ -394,12 +415,15 @@ func (r *ReflectRouter) ParseFuncName(context *HttpContext, option *RouterOption
 func (r *ReflectRouter) CallFuncBefore(context *HttpContext, option *RouterOption) HttpStatus {
 	statucCode := Status200
 
-	if nil != r.implBeforeAfter {
+	if r.isBeforeAfter {
+
 		if reflect.Invalid != option.RouterDataRefVal.Kind() {
+
 			beforeAfter := option.RouterDataRefVal.Interface().(BeforeAfterController)
 			statucCode = beforeAfter.Before(context, option)
-		} else {
-			statucCode = r.implBeforeAfter.Before(context, option)
+
+		} else if nil != r.beforeAfter {
+			statucCode = r.beforeAfter.Before(context, option)
 		}
 	}
 
@@ -475,12 +499,14 @@ func (r *ReflectRouter) ParseTemplatePath(context *HttpContext, funcName string,
 }
 
 func (r *ReflectRouter) CallFuncAfter(context *HttpContext, option *RouterOption) {
-	if nil != r.implBeforeAfter {
-		if reflect.Invalid == option.RouterDataRefVal.Kind() {
+	if r.isBeforeAfter {
+		if reflect.Invalid != option.RouterDataRefVal.Kind() {
+
 			beforeAfter := option.RouterDataRefVal.Interface().(BeforeAfterController)
 			beforeAfter.After(context, option)
-		} else {
-			r.implBeforeAfter.After(context, option)
+
+		} else if nil != r.beforeAfter {
+			r.beforeAfter.After(context, option)
 		}
 	}
 }

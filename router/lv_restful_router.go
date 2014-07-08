@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2014-06-30
-//  Update on 2014-07-02
+//  Update on 2014-07-08
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -163,20 +163,24 @@ func (o *RESTfulRouterOption) Checked() {
 //
 //	控制器分的指针传递和值传递
 //		值传递：
-//		CreateReflectController("/home/", HomeController{})
-//		每次请求(http://localhost:8080/home/)时 controller 都会根据设置的控制器类型新建立一个对象进行处理
+//		CreateReflectController("/pointer/struct/", PointerController{})
+//		每次请求(http://localhost:8080/pointer/struct/) 都会根据设置的控制器类型新建立一个对象进行处理，直到一次请求周期结束。
 //
 //		指针传递：
-//		CreateReflectController("/admin/", &AdminController{})
+//		CreateReflectController("/pointer/", new(PointerController))
 //		跟值传递相反，每次请求时都会使用设置的控制器地址进行处理，应用结束也不会改变，每次请求控制器都不会改变内存地址
-//		这里涉及到并发时同时使用一个内存地址处理的问题，不过目前还没有弄到锁，并发后期会进行改进和处理。
+//		这里涉及到并发时同时使用一个内存地址处理的问题，使用时需要注意
 //
 type RESTfulRouter struct {
-	routerKey       string                // router key
-	implBeforeAfter BeforeAfterController // implement interface
-	implAdeRouter   AdeRouterController   // implement interface
-	controller      RESTfulController     //
-	ctlType         reflect.Type          //
+	routerKey string // router key
+
+	beforeAfter   BeforeAfterController // implement interface
+	adeRouter     AdeRouterController   // implement interface
+	isBeforeAfter bool                  //
+	isAdeRouter   bool                  //
+
+	controller RESTfulController //
+	ctlType    reflect.Type      //
 
 	option RESTfulRouterOption
 	info   string
@@ -206,21 +210,32 @@ func CreateRESTfulControllerWithOption(routerKey string, controller RESTfulContr
 	router.routerKey = routerKey
 	router.option = option
 	router.controller = controller
+	router.ctlType = reflect.TypeOf(controller)
 
-	refType := reflect.TypeOf(controller)
-	router.ctlType = refType
+	//	使用指针类型获取所有函数，否则非指针结构获取的只能是非指针的函数
+	refType := reflect.New(reflect.Indirect(reflect.ValueOf(controller)).Type()).Type()
 
 	if refType.Implements(RefTypeAdeRouterController) {
-		router.implAdeRouter = controller.(AdeRouterController)
+
+		if reflect.Ptr == router.ctlType.Kind() {
+			router.adeRouter = controller.(AdeRouterController)
+		}
+
+		router.isAdeRouter = true
 		strAde = "(Implemented AdeRouterController)"
 	}
 
 	if refType.Implements(RefTypeBeforeAfterController) {
-		router.implBeforeAfter = controller.(BeforeAfterController)
+
+		if reflect.Ptr == router.ctlType.Kind() {
+			router.beforeAfter = controller.(BeforeAfterController)
+		}
+
+		router.isBeforeAfter = true
 		strBeforeAfter = "(Implemented BeforeAfterController)"
 	}
 
-	router.info = fmt.Sprintf("RESTfulRouter(%v) %v%v", refType, strBeforeAfter, strAde)
+	router.info = fmt.Sprintf("RESTfulRouter(%v) %v%v", router.ctlType, strBeforeAfter, strAde)
 
 	return router
 }
@@ -246,14 +261,16 @@ func (r *RESTfulRouter) AfterRouterParse(context *HttpContext, option *RouterOpt
 func (r *RESTfulRouter) ParseFuncName(context *HttpContext, option *RouterOption) (funcName string, statusCode HttpStatus, err error) {
 
 	/* 高级路由实现操作 */
-	if nil != r.implAdeRouter {
+	if r.isAdeRouter {
 		var params map[string]string = nil
 
 		if nil != option.RouterData {
+
 			adeRouter := option.RouterData.(AdeRouterController)
 			funcName, params = adeRouter.RouterMethodParse(option)
-		} else {
-			funcName, params = r.implAdeRouter.RouterMethodParse(option)
+
+		} else if nil != r.adeRouter {
+			funcName, params = r.adeRouter.RouterMethodParse(option)
 		}
 
 		if 0 == len(funcName) {
@@ -281,12 +298,14 @@ func (r *RESTfulRouter) ParseFuncName(context *HttpContext, option *RouterOption
 func (r *RESTfulRouter) CallFuncBefore(context *HttpContext, option *RouterOption) HttpStatus {
 	statucCode := Status200
 
-	if nil != r.implBeforeAfter {
+	if r.isBeforeAfter {
 		if nil != option.RouterData {
+
 			beforeAfter := option.RouterData.(BeforeAfterController)
 			statucCode = beforeAfter.Before(context, option)
-		} else {
-			statucCode = r.implBeforeAfter.Before(context, option)
+
+		} else if nil != r.beforeAfter {
+			statucCode = r.beforeAfter.Before(context, option)
 		}
 	}
 
@@ -360,12 +379,14 @@ func (r *RESTfulRouter) ParseTemplatePath(context *HttpContext, funcName string,
 }
 
 func (r *RESTfulRouter) CallFuncAfter(context *HttpContext, option *RouterOption) {
-	if nil != r.implBeforeAfter {
+	if r.isBeforeAfter {
 		if nil != option.RouterData {
+
 			beforeAfter := option.RouterData.(BeforeAfterController)
 			beforeAfter.After(context, option)
-		} else {
-			r.implBeforeAfter.After(context, option)
+
+		} else if nil != r.beforeAfter {
+			r.beforeAfter.After(context, option)
 		}
 	}
 }
