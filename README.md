@@ -100,7 +100,7 @@ go build 编译后运行编译出来的文件，然后在浏览器中打开：`h
 `can't find import: "github.com/slowfei/gosfuuid"`
 > 直接在需要编译的项目路径中用go install命令来安装gosfcore和gosfuuid
 
-#### [进入Leafveingo基础入门](doc/01.md)
+#### [进入Leafveingo基础入门](doc/01.md) (注意：Leafveingo整改后文档还未整改完成，可以先查看sample案例)
 
 框架功能
 -------------
