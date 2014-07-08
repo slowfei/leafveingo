@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-13
-//  Update on 2014-07-02
+//  Update on 2014-07-08
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -53,7 +53,9 @@ type HttpContext struct {
 	comperssWriter  io.Writer             //
 	isCloseWriter   bool                  // is cell closeWriter()
 
-	formparams *parampack //	form params
+	formparams   *parampack // form params
+	formparamErr error      // parse param error info
+	isParseForm  bool       //
 
 	RespWrite http.ResponseWriter
 	Request   *http.Request
@@ -82,7 +84,20 @@ func newContext(server *LeafveinServer, rw http.ResponseWriter, req *http.Reques
 		outWrite = rw
 	}
 
-	return &HttpContext{lvServer: server, RespWrite: rw, Request: req, reqBody: nil, session: nil, contentEncoding: encoding, comperssWriter: outWrite, isCloseWriter: false}
+	contenxt := new(HttpContext)
+	contenxt.lvServer = server
+	contenxt.RespWrite = rw
+	contenxt.Request = req
+	contenxt.reqBody = nil
+	contenxt.session = nil
+	contenxt.contentEncoding = encoding
+	contenxt.comperssWriter = outWrite
+	contenxt.isCloseWriter = false
+	contenxt.isParseForm = false
+	contenxt.formparamErr = nil
+	contenxt.formparams = nil
+
+	return contenxt
 }
 
 /**
@@ -118,6 +133,37 @@ func (ctx *HttpContext) free() {
 	ctx.RespWrite = nil
 	ctx.Request = nil
 	ctx.routerElement = nil
+}
+
+/**
+ *	parse form params
+ *
+ */
+func (ctx *HttpContext) parseForm() error {
+
+	if !ctx.isParseForm {
+		var err error = nil
+		ctx.formparams, err = parampackParseForm(ctx.Request, ctx.lvServer.FileUploadSize())
+		if nil != err {
+			pfpErr := *ErrParampackParseFormParams
+			pfpErr.UserInfo = "error info: " + err.Error()
+			ctx.lvServer.log.Debug(pfpErr.Error())
+			err = &pfpErr
+
+			ctx.formparamErr = err
+		}
+
+		if nil == ctx.formparams {
+			ctx.formparams = new(parampack)
+			if nil == ctx.formparamErr {
+				ctx.formparamErr = ErrParampackParseFormParams
+			}
+		}
+
+		ctx.isParseForm = true
+	}
+
+	return ctx.formparamErr
 }
 
 /**
@@ -387,21 +433,8 @@ func (ctx *HttpContext) PackStructForm(nilStruct interface{}) (ptrStruct interfa
  */
 func (ctx *HttpContext) PackStructFormByRefType(structType reflect.Type) (refVal reflect.Value, err error) {
 
-	if nil == ctx.formparams {
-		ctx.formparams, err = parampackParseForm(ctx.Request, ctx.lvServer.FileUploadSize())
-		if nil != err {
-
-			pfpErr := *ErrParampackParseFormParams
-			pfpErr.UserInfo = "error info: " + err.Error()
-			ctx.lvServer.log.Debug(pfpErr.Error())
-			err = &pfpErr
-		}
-	}
-
-	if nil == ctx.formparams {
-		if nil == err {
-			err = ErrParampackParseFormParams
-		}
+	err = ctx.parseForm()
+	if nil != err {
 		return
 	}
 
@@ -421,6 +454,7 @@ func (ctx *HttpContext) PackStructFormByRefType(structType reflect.Type) (refVal
 
 	//	set stauct field value
 	if isNewStruct {
+
 		for k, v := range ctx.formparams.params {
 			count := len(v)
 			switch {
@@ -431,6 +465,7 @@ func (ctx *HttpContext) PackStructFormByRefType(structType reflect.Type) (refVal
 			}
 
 		}
+
 		for fk, fv := range ctx.formparams.files {
 			count := len(fv)
 			switch {
