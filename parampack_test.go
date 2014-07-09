@@ -36,7 +36,6 @@ type Params struct {
 
 //	测试单个设值测试，此函数主要用户调试测试
 func TestStringNameSetStructFieldValue(t *testing.T) {
-	leafvein := &sfLeafvein{}
 
 	keys := url.Values{}
 	// keys.Add("users[0].hobbys[0].name", "hobbys0-0")
@@ -56,7 +55,7 @@ func TestStringNameSetStructFieldValue(t *testing.T) {
 	keys.Add("usersP[0].hobbys[1].name", "userP0-hobbys0-1")
 	keys.Add("usersP[1].hobbys[0].name", "userP1-hobbys1-0")
 
-	refValue := leafvein.newStructPtr(reflect.TypeOf(Params{}), keys)
+	refValue := parampackNewStructPtr(reflect.TypeOf(Params{}), keys)
 
 	// str := "userP0-hobbys0-0"
 	// leafvein.setStructFieldValue(refValue, "usersP[0].hobbys[0].name", &str)
@@ -69,7 +68,6 @@ func TestStringNameSetStructFieldValue(t *testing.T) {
 
 //	设置结构字段测试
 func funcSetStructFieldValue() *Params {
-	leafvein := &sfLeafvein{}
 
 	keys := url.Values{}
 	keys.Add("users[0].hobbys[0].name", "hobbys0-0")
@@ -85,11 +83,11 @@ func funcSetStructFieldValue() *Params {
 	keys.Add("oneUser.userPwd", "onePwd")
 
 	start := time.Now()
-	refValue := leafvein.newStructPtr(reflect.TypeOf(Params{}), keys)
+	refValue := parampackNewStructPtr(reflect.TypeOf(Params{}), keys)
 	fmt.Println("newStructPtr time :", time.Now().Sub(start))
 	start = time.Now()
 	for k, v := range keys {
-		leafvein.setStructFieldValue(refValue, k, v[0])
+		parampackSetStructFieldValue(refValue, k, v[0])
 	}
 	fmt.Println("setStructFieldValue time :", time.Now().Sub(start))
 	return refValue.Interface().(*Params)
@@ -122,7 +120,7 @@ func TestSetStructFieldValue(t *testing.T) {
 	}
 
 	if "oneName" != params.OneUser.UserName {
-		t.Error("oneName != params.OneUser.UserName 设值不正确")
+		t.Error("oneName != params.OneUser.UserName 设值不正确 " + params.OneUser.UserName)
 		return
 	}
 
@@ -170,8 +168,6 @@ func TestSetStructFieldValue(t *testing.T) {
 //	提供TestNewStructPtr和Benchmark_NewStructPtr进行测试
 func funcNewStructPtr() interface{} {
 
-	leafvein := &sfLeafvein{}
-
 	keys := url.Values{}
 
 	keys.Add("oneUser.hobbys[0].names[2]", "one-0-hobbys-0-names-2")
@@ -190,7 +186,7 @@ func funcNewStructPtr() interface{} {
 	keys.Add("users[0].hobbys[0].name", "hobbys1")
 
 	rt := reflect.TypeOf(Params{})
-	rv := leafvein.newStructPtr(rt, keys)
+	rv := parampackNewStructPtr(rt, keys)
 	return rv.Interface()
 }
 
