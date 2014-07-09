@@ -649,6 +649,16 @@ func (lv *LeafveinServer) GetHandlerFunc(prefix string) (handler http.Handler, e
 }
 
 /**
+ *	testing use
+ *
+ *	@param parse router result
+ */
+func (lv *LeafveinServer) TestStart() bool {
+	logInfo := ""
+	return lv.parseRouter(&logInfo, "TestSet")
+}
+
+/**
  *	add router
  *	leafvein interface implement RESTfulRouter ReflectRouter
  *
