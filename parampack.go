@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-16
-//  Update on 2014-06-24
+//  Update on 2014-07-11
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -107,7 +107,7 @@ func parampackParseForm(req *http.Request, fileUploadSize int64) (param *parampa
 		}
 	default:
 		param = new(parampack)
-		param.params = make(url.Values)
+		param.params = req.URL.Query()
 	}
 
 	return
