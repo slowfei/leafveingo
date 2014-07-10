@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2014-06-16
-//  Update on 2014-07-08
+//  Update on 2014-07-10
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -386,20 +386,21 @@ func (r *ReflectRouter) ParseFuncName(context *HttpContext, option *RouterOption
 
 		AZ := c >= 'A' && c <= 'Z'
 		az := c >= 'a' && c <= 'z'
+		number := c >= '0' && c <= '9'
 
-		if AZ || az {
+		if AZ || az || number {
 			if isUpper {
 				isUpper = false
 				if az {
 					c -= 'a' - 'A'
 				}
 			}
+			nameByte[writeIdx] = c
+			writeIdx++
 		} else {
 			isUpper = true
 		}
 
-		nameByte[writeIdx] = c
-		writeIdx++
 	}
 
 	if 0 != writeIdx {
