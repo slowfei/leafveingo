@@ -23,6 +23,7 @@
 package LVRouter
 
 import (
+	"errors"
 	"fmt"
 	. "github.com/slowfei/leafveingo"
 	"reflect"
@@ -192,7 +193,7 @@ type RESTfulRouter struct {
  *	@param routerKey	"/" || "/home/" || "/admin/"
  *	@param controller
  */
-func CreateRESTfulController(routerKey string, controller RESTfulController) IRouter {
+func CreateRESTfulController(routerKey string, controller interface{}) IRouter {
 	return CreateRESTfulControllerWithOption(routerKey, controller, DefaultRESTfulRouterOption())
 }
 
@@ -201,19 +202,25 @@ func CreateRESTfulController(routerKey string, controller RESTfulController) IRo
  *
  *	@param option 	other params option
  */
-func CreateRESTfulControllerWithOption(routerKey string, controller RESTfulController, option RESTfulRouterOption) IRouter {
+func CreateRESTfulControllerWithOption(routerKey string, controller interface{}, option RESTfulRouterOption) IRouter {
 	option.Checked()
 	strBeforeAfter := ""
 	strAde := ""
+	ok := false
+
+	newRefController := reflect.New(reflect.Indirect(reflect.ValueOf(controller)).Type())
 
 	router := new(RESTfulRouter)
 	router.routerKey = routerKey
 	router.option = option
-	router.controller = controller
 	router.ctlType = reflect.TypeOf(controller)
+	router.controller, ok = newRefController.Interface().(RESTfulController)
+	if !ok {
+		panic(errors.New(fmt.Sprintf("%v does not implement RESTfulController method has pointer receiver", router.ctlType.String())))
+	}
 
 	//	使用指针类型获取所有函数，否则非指针结构获取的只能是非指针的函数
-	refType := reflect.New(reflect.Indirect(reflect.ValueOf(controller)).Type()).Type()
+	refType := newRefController.Type()
 
 	if refType.Implements(RefTypeAdeRouterController) {
 
