@@ -172,7 +172,7 @@ func (ctx *HttpContext) parseForm() error {
  *
  *	@return SFHelper.Map
  */
-func (ctx *HttpContext) Application() SFHelper.Map {
+func (ctx *HttpContext) Application() *SFHelper.Map {
 	return ctx.lvServer.application
 }
 
