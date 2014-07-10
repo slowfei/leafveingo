@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2014-07-08
+//  Update on 2014-07-11
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
@@ -70,7 +70,7 @@ const (
 
 var (
 	//	开发模式命令
-	_flagDeveloper bool
+	FlagDeveloper bool
 
 	//	TODO Remove
 	// _rexW = regexp.MustCompile("\\w+")
@@ -83,7 +83,7 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&_flagDeveloper, "devel", false, "developer mode start.")
+	flag.BoolVar(&FlagDeveloper, "devel", false, "developer mode start.")
 }
 
 //#pragma mark leafveingo func	----------------------------------------------------------------------------------------------------
@@ -247,7 +247,7 @@ type LeafveinServer struct {
 
 	/* #mark system patams ******************/
 
-	application    SFHelper.Map                  //	application
+	application    *SFHelper.Map                 //	application
 	sessionManager *LVSession.HttpSessionManager //	http session manager
 	template       *LVTemplate.Template          //	template
 	log            *SFLog.SFLogger
@@ -601,9 +601,9 @@ func (lv *LeafveinServer) Start() {
 		flag.Parse()
 	}
 
-	lv.isDevel = _flagDeveloper
+	lv.isDevel = FlagDeveloper
 
-	if _flagDeveloper {
+	if FlagDeveloper {
 		lv.start("DevelStart")
 	} else {
 		args := flag.Args()
@@ -771,7 +771,7 @@ func (lv *LeafveinServer) IsStart() bool {
  *
  *	@return
  */
-func (lv *LeafveinServer) Application() SFHelper.Map {
+func (lv *LeafveinServer) Application() *SFHelper.Map {
 	return lv.application
 }
 
