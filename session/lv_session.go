@@ -13,8 +13,8 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-24
-//  Update on 2014-06-12
-//  Email  slowfei@foxmail.com
+//  Update on 2014-07-10
+//  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
 //	leafveingo web http session 的封装
@@ -72,7 +72,7 @@ const (
 var (
 	ErrSessionManagerFree = errors.New("session manager is freed")
 	ErrCookieWrite        = errors.New("cookie can not write...")
-	ErrIPValidateFail     = "ip information can not verified :%v"
+	ErrIPValidateFail     = "ip information can not verified : "
 
 	_ipFilterChar = strings.NewReplacer("[", "", "]", "")
 	thisLog       = SFLog.NewLogger("LVSession")
@@ -85,6 +85,7 @@ type HttpSessionManager struct {
 	CookieTokenHash        func() hash.Hash            // cookie token hmac hash, default sha256.New
 	CookieTokenRandLen     int                         // cookie token rand string len bit
 	CookieTokenMaxlifeTime int32                       // cookie token maxlife time, default 300second
+	IPHeaderKey            string                      // proxy to http headers set ip key, default ""
 	globalTokenKey         []byte                      // global token hmac key, default rand string(256bit)
 	scanGCTime             int64                       // 设置一个定时的时间对http session进行扫描清理,默认300秒,必须大于60秒
 	listRank               map[int32]*list.List        // sessions根据有效时间排列的列队
@@ -263,7 +264,7 @@ func (sm *HttpSessionManager) GetSession(rw http.ResponseWriter, req *http.Reque
 							session.accessIP = ip
 							session.recordIPAccess(ip)
 						} else {
-							panic(thisLog.Error(ErrIPValidateFail, req.RemoteAddr))
+							panic(thisLog.Error(ErrIPValidateFail + req.RemoteAddr))
 						}
 
 					}
@@ -346,12 +347,23 @@ func (sm *HttpSessionManager) getUUID() (SFUUID.UUID, string) {
 }
 
 func (sm *HttpSessionManager) getUserIPAddr(req *http.Request) (net.IP, bool) {
-	//	TODO 需要测试在使用Apache,Squid等反向代理时，需要查看IP是否获取正确，否则需要想别的办法。
+
 	userAddr := req.RemoteAddr
+
+	//	反向代理IP的获取
+	if 0 != len(sm.IPHeaderKey) {
+		userAddr = req.Header.Get(sm.IPHeaderKey)
+	}
+
+	if 0 == len(userAddr) {
+		return nil, false
+	}
 
 	//	去除端口号
 	portIndex := strings.LastIndex(userAddr, ":")
-	userAddr = userAddr[:portIndex]
+	if 0 < portIndex {
+		userAddr = userAddr[:portIndex]
+	}
 
 	ip := net.ParseIP(userAddr)
 
@@ -480,7 +492,7 @@ func (sm *HttpSessionManager) createSession(maxlifeTime int32, request *http.Req
 		s.accessIP = ip
 		s.recordIPAccess(ip)
 	} else {
-		panic(thisLog.Error(ErrIPValidateFail, request.RemoteAddr))
+		panic(thisLog.Error(ErrIPValidateFail + request.RemoteAddr))
 	}
 
 	//	寻找@maxlifeTime的列队，如果寻找得到可以直接插入寻找到数列前面

@@ -223,6 +223,7 @@ type LeafveinServer struct {
 	staticFileSuffixes  map[string]string // supported static file suffixes
 	serverTimeout       int64             // server time out, default 0
 	sessionMaxlifeTime  int32             // http session maxlife time, unit second. use session set
+	ipHeaderKey         string            // proxy to http headers set ip key, default ""
 	isReqPathIgnoreCase bool              // request url path ignore case
 	multiProjectHosts   []string          // setting integrated multi-project hosts
 
@@ -361,6 +362,7 @@ func (lv *LeafveinServer) configReload(cf *Config) {
 	lv.SetCharset(cf.Charset)
 	lv.SetStaticFileSuffixes(cf.StaticFileSuffixes...)
 	lv.SetSessionMaxlifeTime(cf.SessionMaxlifeTime)
+	lv.SetIPHeaderKey(cf.IPHeaderKey)
 	lv.SetReqPathIgnoreCase(cf.IsReqPathIgnoreCase)
 	lv.SetTemplateSuffix(cf.TemplateSuffix)
 	lv.SetRespWriteCompress(cf.IsRespWriteCompress)
@@ -792,6 +794,7 @@ func (lv *LeafveinServer) SetHttpSessionManager(sessionManager *LVSession.HttpSe
 
 	if nil != sessionManager {
 		lv.sessionManager = sessionManager
+		lv.sessionManager.IPHeaderKey = lv.ipHeaderKey
 	}
 }
 
@@ -947,6 +950,19 @@ func (lv *LeafveinServer) SetSessionMaxlifeTime(second int32) {
  */
 func (lv *LeafveinServer) SessionMaxlifeTime() int32 {
 	return lv.sessionMaxlifeTime
+}
+
+/**
+ *	use reverse proxy set header ip key
+ *
+ *	@param key
+ */
+func (lv *LeafveinServer) SetIPHeaderKey(key string) {
+	lv.ipHeaderKey = key
+
+	if nil != lv.sessionManager {
+		lv.sessionManager.IPHeaderKey = key
+	}
 }
 
 /**

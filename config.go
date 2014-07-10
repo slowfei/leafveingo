@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-11-06
-//  Update on 2014-07-02
+//  Update on 2014-07-10
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -55,24 +55,25 @@ const (
 var (
 	_defaultConfigJson = `
 	{
-		"AppVersion"		:"1.0",
-		"FileUploadSize"	:33554432,
-		"Charset"		:"utf-8",
+		"AppVersion"			:"1.0",
+		"FileUploadSize"		:33554432,
+		"Charset"				:"utf-8",
 		"StaticFileSuffixes"	:[".js", ".css", ".png", ".jpg", ".gif", ".ico", ".html"],
-		"ServerTimeout"		:0,
+		"ServerTimeout"			:0,
 		"SessionMaxlifeTime"	:1800,
-		"IsReqPathIgnoreCase"	: true,
+		"IPHeaderKey"			:"",
+		"IsReqPathIgnoreCase"	:true,
 		"MultiProjectHosts"		:[],
 
-		"TemplateSuffix"	:".tpl",
+		"TemplateSuffix"		:".tpl",
 		"IsCompactHTML"			:true,
 
-		"LogConfigPath"		:"config/log.conf",
-		"LogGroup" 			:"",
+		"LogConfigPath"			:"config/log.conf",
+		"LogGroup" 				:"",
 
 		"IsRespWriteCompress"	:true,
 		
-		"UserData"		:{}
+		"UserData"				:{}
 	}`
 )
 
@@ -87,6 +88,7 @@ type Config struct {
 	StaticFileSuffixes  []string // supported static file suffixes
 	ServerTimeout       int64    // server time out, default 0
 	SessionMaxlifeTime  int32    // http session maxlife time, unit second. use session set
+	IPHeaderKey         string   // proxy to http headers set ip key, default ""
 	IsReqPathIgnoreCase bool     // request url path ignore case
 	MultiProjectHosts   []string // setting integrated multi-project hosts,default nil
 
