@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-13
-//  Update on 2014-07-08
+//  Update on 2014-07-11
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -26,6 +26,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"github.com/slowfei/gosfcore/helper"
 	"github.com/slowfei/gosfcore/utils/strings"
 	"github.com/slowfei/leafveingo/session"
 	"io"
@@ -164,6 +165,15 @@ func (ctx *HttpContext) parseForm() error {
 	}
 
 	return ctx.formparamErr
+}
+
+/**
+ *	get	global info storage map
+ *
+ *	@return SFHelper.Map
+ */
+func (ctx *HttpContext) Application() SFHelper.Map {
+	return ctx.lvServer.application
 }
 
 /**
