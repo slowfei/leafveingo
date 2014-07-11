@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-13
-//  Update on 2014-07-11
+//  Update on 2014-07-12
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -425,11 +425,10 @@ func (ctx *HttpContext) StatusPageWriteByValue(value HttpStatusValue) error {
 func (ctx *HttpContext) PackStructForm(nilStruct interface{}) (ptrStruct interface{}, err error) {
 	refVal, e := ctx.PackStructFormByRefType(reflect.TypeOf(nilStruct))
 
-	if nil == e {
+	if reflect.Invalid != refVal.Kind() {
 		ptrStruct = refVal.Interface()
-	} else {
-		err = e
 	}
+	err = e
 
 	return
 }
