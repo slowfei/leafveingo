@@ -13,8 +13,8 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-24
-//  Update on 2014-06-20
-//  Email  slowfei@foxmail.com
+//  Update on 2014-07-14
+//  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
 //	leafveingo web 模板操作模块
@@ -35,11 +35,12 @@ import (
 
 const (
 	//嵌入模板函数key名
-	kLVEmbedTempate = "LVEmbedTempate"
-	kLVMapPack      = "LVMapPack"
-	kLVTimeFormat   = "LVTimeFormat"
-	kLVStringToHtml = "LVStringToHtml"
-	kGOVersion      = "GoVersion"
+	kLVEmbedTempate       = "LVEmbedTempate"
+	kLVEmbedTempateByName = "LVEmbedTempateByName"
+	kLVMapPack            = "LVMapPack"
+	kLVTimeFormat         = "LVTimeFormat"
+	kLVStringToHtml       = "LVStringToHtml"
+	kGOVersion            = "GoVersion"
 )
 
 var (
@@ -109,6 +110,7 @@ type Template struct {
 func (l *Template) initPrivate() {
 	l.funcMap = make(template.FuncMap)
 	l.funcMap[kLVEmbedTempate] = l.embedTempate
+	l.funcMap[kLVEmbedTempateByName] = l.embedTempateByName
 	l.funcMap[kLVStringToHtml] = l.stringToHtml
 	l.funcMap[kLVMapPack] = l.mapPack
 	l.funcMap[kGOVersion] = runtime.Version

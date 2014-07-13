@@ -13,8 +13,8 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-24
-//  Update on 2013-10-23
-//  Email  slowfei@foxmail.com
+//  Update on 2014-07-14
+//  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
 //	leafveingo web 模板使用函数模块
@@ -26,9 +26,13 @@ import (
 	"strings"
 )
 
-//	嵌入模板函数
-//	@tplPath	模板的相对路径
-//	@data		需要传递的数据
+/**
+ *	嵌入模板函数
+ *
+ *	@param tplPath	template relative path
+ *	@param data		template data
+ *	@return	template.HTML
+ */
 func (l *Template) embedTempate(tplPath string, data interface{}) template.HTML {
 
 	tmpl, err := l.Parse(tplPath)
@@ -41,21 +45,46 @@ func (l *Template) embedTempate(tplPath string, data interface{}) template.HTML 
 	} else {
 		return ""
 	}
-
 }
 
-//	string转换成html标签代码
-//	@str
-//	@return
+/**
+ *	嵌入模版函数，根据模版名查询模版
+ *
+ *	@param tplName	cache template name
+ *	@param data		template data
+ *	@return	template.HTML
+ */
+func (l *Template) embedTempateByName(tplName string, data interface{}) template.HTML {
+
+	if tmpl := l.goTemplate.Lookup(tplName); nil != tmpl {
+		bufStr := bytes.NewBufferString("")
+		tmpl.Execute(bufStr, data)
+		return template.HTML(bufStr.String())
+	} else {
+		return template.HTML("\"" + tplName + "\" name not found template.")
+	}
+}
+
+/**
+ *	string转换成html标签代码
+ *
+ *	@param str
+ *	@return
+ */
 func (l *Template) stringToHtml(str string) template.HTML {
 	return template.HTML(str)
 }
 
-//	map类型数据的封装
-//	注意，传递合并的map类型需要是map[string]interface{}，否则会出错
-//	slice值的添加："array" "value1,value2,value3"
-//	@mergerMap 需要合并的map
-//	@strs	   根据key value的顺序进行添加
+/**
+ *	map类型数据的封装
+ *
+ *	注意，传递合并的map类型需要是map[string]interface{}，否则会出错
+ *	slice值的添加："array" "value1,value2,value3"
+ *				   key      value
+ *
+ *	@mergerMap 需要合并的map
+ *	@strs	   根据key value的顺序进行添加
+ */
 func (l *Template) mapPack(mergerMap map[string]interface{}, strs ...string) map[string]interface{} {
 	var thisMap map[string]interface{} = nil
 
