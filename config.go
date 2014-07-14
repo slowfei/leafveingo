@@ -28,6 +28,7 @@ import (
 	"github.com/slowfei/gosfcore/utils/filemanager"
 	"io/ioutil"
 	"path/filepath"
+	"time"
 )
 
 const (
@@ -50,6 +51,9 @@ const (
 	DEFAULT_SESSION_MAX_LIFE_TIME = 1800
 	//	default log channel size
 	DEFAULT_LOG_CHANNEL_SIZE = 5000
+
+	//	default KeepAlivePeriod
+	DEFAULT_KEEP_ALIVE_PERIOD = 3 * time.Minute
 )
 
 var (

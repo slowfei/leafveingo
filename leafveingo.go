@@ -233,6 +233,9 @@ type LeafveinServer struct {
 	logConfigPath string // log config path, relative or absolute path, relative path from execute file root directory
 	logGroup      string // log group name
 
+	certPath string //	generate cert.pem
+	keyPath  string //	generate key.pem
+
 	// is ResponseWriter writer compress gizp...
 	// According Accept-Encoding select compress type
 	// default true
@@ -522,19 +525,27 @@ func (lv *LeafveinServer) start(startName string) {
 		WriteTimeout: time.Duration(lv.serverTimeout) * time.Second,
 	}
 
-	var err error
-	lv.listener, err = net.Listen("tcp", addr)
+	netListen, err := net.Listen("tcp", addr)
 	if err != nil {
 		lv.log.Fatal("Leafveingo %v Listen: %v \n", startName, err)
 		return
 	}
 
-	lv.isStart = true
-	err = server.Serve(lv.listener)
-	if err != nil {
-		lv.log.Fatal("Leafveingo %v Serve: %v \n", startName, err)
-		lv.isStart = false
+	if 0 != len(lv.certPath) && 0 != len(lv.keyPath) {
+		//	TODO SSL Handle
+		//	http://golang.org/src/pkg/net/http/server.go?#L1823
+	} else {
+		lv.isStart = true
+
+		lv.listener = leafveinListener{netListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD}
+		err = server.Serve(lv.listener)
+
+		if err != nil {
+			lv.log.Fatal("Leafveingo %v Serve: %v \n", startName, err)
+			lv.isStart = false
+		}
 	}
+
 }
 
 /**
