@@ -60,6 +60,7 @@ func AddRouter(appName string, router IRouter) {
 //
 type RouterElement struct {
 	host       string
+	scheme     string
 	routerKeys []string
 	routers    map[string]IRouter
 }
@@ -206,13 +207,19 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 
 	reqPathLen := len(lowerReqPath)
 
-	// FOR routerList -> IF host -> FOR keys -> IF reqPath
+	// FOR routerList -> IF host -> IF scheme -> FOR keys -> IF reqPath
 
 	listCount := len(context.lvServer.routerList)
 	for i := 0; i < listCount; i++ {
 		element := context.lvServer.routerList[i]
 
 		if context.reqHost == element.host {
+
+			if 0 != len(element.scheme) && context.reqScheme != element.scheme {
+				//	TODO 如果scheme与控制器要求访问的scheme不相同考虑重定向。
+				statusCode = Status404
+				return
+			}
 
 			keyCount := len(element.routerKeys)
 			for j := 0; j < keyCount; j++ {
@@ -245,7 +252,7 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 						option.RouterKey = key
 						option.RouterPath = lowerReqPath[keyLen:]
 
-						router.AfterRouterParse(context, option)
+						statusCode = router.AfterRouterParse(context, option)
 					} else {
 						//	基本上不会进来此处
 						context.lvServer.log.Error("lv.routerKeys contains %#v and lv.routers not contains %#v", key, key)
