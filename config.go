@@ -93,9 +93,9 @@ type Config struct {
 	MultiProjectHosts   []string // setting integrated multi-project hosts,default nil
 
 	TemplateSuffix string // template suffix
-	IsCompactHTML  bool   // is Compact HTML, 默认true
+	IsCompactHTML  bool   // is Compact HTML, default true
 
-	LogConfigPath string // log config path
+	LogConfigPath string // log config path, relative or absolute path, relative path from execute file root directory
 	LogGroup      string // log group name
 
 	// is ResponseWriter writer compress gizp...
