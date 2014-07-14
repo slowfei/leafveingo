@@ -147,7 +147,7 @@ type ServerOption struct {
 
 	Port       int    // ip port. default 8080
 	SMGCTime   int64  // session manager gc operate time. 0 is not run session, minimum 60 second. default 300
-	ConfigPath string // config file path, can set empty. default ""
+	ConfigPath string // relative or absolute path, relative path from execute file root directory, can set empty. default ""
 }
 
 /**
@@ -230,7 +230,7 @@ type LeafveinServer struct {
 	templateSuffix string // template suffix
 	isCompactHTML  bool   // is Compact HTML, default true
 
-	logConfigPath string // log config path
+	logConfigPath string // log config path, relative or absolute path, relative path from execute file root directory
 	logGroup      string // log group name
 
 	// is ResponseWriter writer compress gizp...
@@ -591,6 +591,129 @@ func (lv *LeafveinServer) deferServeHTTP(contextPrt **HttpContext, rw http.Respo
 	}
 }
 
+/**
+ *	handle request URL
+ *
+ *	@param rw
+ *	@param req
+ *	@return reqSuffix	request url suffix
+ *	@return reqHost		request url host
+ *	@return pass 		is true continue other operations
+ */
+func (lv *LeafveinServer) requestURLHandle(rw http.ResponseWriter, req *http.Request, reqPath string) (reqSuffix, reqHost string, pass bool) {
+	pass = true
+
+	//	前缀url清除，call GetHandlerFunc() 才会使用到此操作
+	//	/expand/index = /index
+	//	/expand       = /
+	if 0 < len(lv.prefix) {
+		reqPath = reqPath[len(lv.prefix):]
+		if 0 != len(reqPath) && '/' != reqPath[0] {
+			reqPath = "/" + reqPath
+		}
+	}
+	if 0 == len(reqPath) {
+		reqPath = "/"
+	}
+
+	//	request suffix, host
+	reqSuffix = path.Ext(reqPath)
+
+	hostsCount := len(lv.multiProjectHosts)
+	if 0 != hostsCount {
+		reqHost = SFStringsUtil.ToLower(req.URL.Host)
+		reqHostLen := len(reqHost)
+
+		//	remove port
+		index := -1
+		for i := reqHostLen - 1; i >= reqHostLen-7; i-- {
+			if ':' == reqHost[i] {
+				index = i
+				break
+			}
+		}
+		if -1 != index {
+			reqHost = reqHost[:index]
+		}
+
+		//	replace 127.0.0.1 host
+		if lv.IsDevel() {
+			if "localhost" == reqHost || "127.0.0.1" == reqHost {
+				urlHost := req.URL.Query().Get(URL_HOST_KEY)
+				if 0 != len(urlHost) {
+					reqHost = urlHost
+				}
+			}
+		}
+
+		//	remove "www."
+		if URL_HOST_WWW_LEN < len(reqHost) && URL_HOST_WWW == reqHost[URL_HOST_WWW_LEN:] {
+			reqHost = reqHost[:URL_HOST_WWW_LEN]
+		}
+
+		//	checked multi-project host
+		pass = false
+		for i := 0; i < hostsCount; i++ {
+			proHost := lv.multiProjectHosts[i]
+			if proHost == reqHost {
+				pass = true
+				break
+			}
+		}
+
+		if !pass {
+			lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "Host("+reqHost+") invalid", ""), rw)
+			return
+		}
+	}
+
+	return
+}
+
+/**
+ *	static file handle
+ *
+ *	@param rw
+ *	@param req
+ *	@param reqPath	  request url path
+ *	@param reqSuffix  request url suffix
+ *	@return pass 	  is true continue other operations
+ */
+func (lv *LeafveinServer) staticFileHandle(rw http.ResponseWriter, req *http.Request, reqPath, reqSuffix, reqHost string) (pass bool) {
+	pass = true
+
+	if _, ok := lv.staticFileSuffixes[reqSuffix]; ok {
+
+		var filePath string
+
+		if 0 != len(reqHost) {
+			filePath = lv.WebRootDir() + "/" + reqHost + reqPath
+		} else {
+			filePath = lv.WebRootDir() + reqPath
+		}
+
+		if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
+			//	处理http.ServeFile函数遇到/index.html被重定向到./的问题
+			if strings.HasSuffix(reqPath, INDEX_PAGE) {
+				// 防止serveFile做判断，具体可以查看http.ServeFile源码
+				req.URL.Path = "/"
+			}
+			http.ServeFile(rw, req, filePath)
+
+			pass = false
+			return
+		}
+		//	查找不到静态文件交由路由器处理
+		// else {
+		// 	// 404
+		// 	// http.NotFound(rw, req)
+		// 	lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "", ""), rw)
+		// }
+	}
+
+	return
+}
+
 //# mark LeafveinServer public method	--------------------------------------------------------------------------------------------
 
 /**
@@ -721,6 +844,7 @@ func (lv *LeafveinServer) AddRouter(router IRouter) {
 	if nil == element {
 		element = new(RouterElement)
 		element.host = controllerHost
+		element.scheme = router.ControllerOption().Scheme()
 		element.routers = make(map[string]IRouter)
 		lv.routerList = append(lv.routerList, element)
 	}
@@ -1163,7 +1287,7 @@ func (lv *LeafveinServer) IsCompactHTML() bool {
  *
  *  Note: need to restart Leafvein Server
  *
- *	@param path
+ *	@param path relative or absolute path, relative path from execute file root directory
  */
 func (lv *LeafveinServer) SetLogConfigPath(path string) {
 	lv.logConfigPath = path
@@ -1221,97 +1345,17 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	defer lv.deferServeHTTP(&context, rw)
 
-	//	前缀url清除，call GetHandlerFunc() 才会使用到此操作
-	//	/expand/index = /index
-	//	/expand       = /
-	if 0 < len(lv.prefix) {
-		reqPath = reqPath[len(lv.prefix):]
-		if 0 != len(reqPath) && '/' != reqPath[0] {
-			reqPath = "/" + reqPath
-		}
-	}
-	if 0 == len(reqPath) {
-		reqPath = "/"
-	}
-
-	//	request suffix, host
-	reqSuffix := path.Ext(reqPath)
-	reqHost := ""
-
-	hostsCount := len(lv.multiProjectHosts)
-	if 0 != hostsCount {
-		reqHost = SFStringsUtil.ToLower(req.URL.Host)
-		reqHostLen := len(reqHost)
-
-		//	remove port
-		index := -1
-		for i := reqHostLen - 1; i >= reqHostLen-7; i-- {
-			if ':' == reqHost[i] {
-				index = i
-				break
-			}
-		}
-		if -1 != index {
-			reqHost = reqHost[:index]
-		}
-
-		//	replace 127.0.0.1 host
-		if lv.IsDevel() {
-			if "localhost" == reqHost || "127.0.0.1" == reqHost {
-				urlHost := req.URL.Query().Get(URL_HOST_KEY)
-				if 0 != len(urlHost) {
-					reqHost = urlHost
-				}
-			}
-		}
-
-		//	remove "www."
-		if URL_HOST_WWW_LEN < len(reqHost) && URL_HOST_WWW == reqHost[URL_HOST_WWW_LEN:] {
-			reqHost = reqHost[:URL_HOST_WWW_LEN]
-		}
-
-		//	checked multi-project host
-		pass := false
-		for i := 0; i < hostsCount; i++ {
-			proHost := lv.multiProjectHosts[i]
-			if proHost == reqHost {
-				pass = true
-			}
-		}
-
-		if !pass {
-			lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "Host("+reqHost+") invalid", ""), rw)
-			return
-		}
+	//	url handle
+	reqSuffix, reqHost, urlHandlePass := lv.requestURLHandle(rw, req, reqPath)
+	if !urlHandlePass {
+		return
 	}
 
 	//	static file handle
 	if 0 != len(reqSuffix) {
-		if _, ok := lv.staticFileSuffixes[reqSuffix]; ok {
-
-			var filePath string
-
-			if 0 != len(reqHost) {
-				filePath = lv.WebRootDir() + "/" + reqHost + reqPath
-			} else {
-				filePath = lv.WebRootDir() + reqPath
-			}
-
-			if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
-				//	处理http.ServeFile函数遇到/index.html被重定向到./的问题
-				if strings.HasSuffix(reqPath, INDEX_PAGE) {
-					// 防止serveFile做判断，具体可以查看http.ServeFile源码
-					req.URL.Path = "/"
-				}
-				http.ServeFile(rw, req, filePath)
-				return
-			}
-			//	查找不到静态文件交由路由器处理
-			// else {
-			// 	// 404
-			// 	// http.NotFound(rw, req)
-			// 	lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "", ""), rw)
-			// }
+		staticFilePass := lv.staticFileHandle(rw, req, reqPath, reqSuffix, reqHost)
+		if !staticFilePass {
+			return
 		}
 	}
 
@@ -1324,9 +1368,9 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)
 
 	if nil != option {
-		lv.log.Info("request url path: [%s,%s,%d]%#v %#v ", option.RequestMethod, option.RouterKey, statusCode, reqPath, option.RouterPath)
+		lv.log.Info("request info: [%s,%s][%s,%s,%d]%#v %#v ", context.reqScheme, reqHost, option.RequestMethod, option.RouterKey, statusCode, reqPath, option.RouterPath)
 	} else {
-		lv.log.Info("request url path: [%s,nil,%d]%#v ", req.Method, statusCode, reqPath)
+		lv.log.Info("request info: [%s,%s][%s,nil,%d]%#v ", context.reqScheme, reqHost, req.Method, statusCode, reqPath)
 	}
 
 	errstr := ""
