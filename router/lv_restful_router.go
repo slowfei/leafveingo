@@ -250,13 +250,7 @@ func CreateRESTfulControllerWithOption(routerKey string, controller interface{},
 //# mark RESTfulRouter override IRouter -------------------------------------------------------------------------------------------
 
 func (r *RESTfulRouter) AfterRouterParse(context *HttpContext, option *RouterOption) HttpStatus {
-	statusCode := Status404
-
-	scheme := r.option.Scheme()
-
-	if 0 != len(scheme) && scheme != context.RequestScheme() {
-		return Status404
-	}
+	statusCode := Status200
 
 	if reflect.Ptr != r.ctlType.Kind() {
 		option.RouterData = reflect.New(r.ctlType).Interface()

@@ -301,12 +301,6 @@ func (r *ReflectRouter) getFuncArgs(funcType reflect.Type, context *HttpContext)
 func (r *ReflectRouter) AfterRouterParse(context *HttpContext, option *RouterOption) HttpStatus {
 	statusCode := Status200
 
-	scheme := r.option.Scheme()
-
-	if 0 != len(scheme) && scheme != context.RequestScheme() {
-		return Status404
-	}
-
 	if reflect.Ptr != r.ctlRefVal.Kind() {
 		option.RouterDataRefVal = reflect.New(r.ctlRefVal.Type())
 	}
