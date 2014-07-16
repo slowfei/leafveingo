@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2014-07-11
+//  Update on 2014-07-15
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
@@ -25,8 +25,10 @@ package leafveingo
 
 import (
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"fmt"
+	// "github.com/slowfei/gosfcore/debug"
 	"github.com/slowfei/gosfcore/helper"
 	"github.com/slowfei/gosfcore/log"
 	"github.com/slowfei/gosfcore/utils/filemanager"
@@ -34,6 +36,7 @@ import (
 	"github.com/slowfei/leafveingo/session"
 	"github.com/slowfei/leafveingo/template"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"path"
@@ -62,6 +65,10 @@ const (
 
 	//	url params host key
 	URL_HOST_KEY = "host"
+
+	//	http protocol
+	HTTP_PROTO_HTTP1  = HttpProto(1) // HTTP/1.0
+	HTTP_PROTO_HTTP11 = HttpProto(2) // HTTP/1.1(https) client requests always use
 
 	//	hosts www
 	URL_HOST_WWW     = "www."
@@ -130,6 +137,10 @@ func addServerList(server *LeafveinServer) {
 	}
 	_serverList = append(_serverList, server)
 }
+
+//#pragma mark HTTP protocol type	----------------------------------------------------------------------------------------------------
+
+type HttpProto int
 
 //#pragma mark ServerOption struct	----------------------------------------------------------------------------------------------------
 
@@ -233,8 +244,10 @@ type LeafveinServer struct {
 	logConfigPath string // log config path, relative or absolute path, relative path from execute file root directory
 	logGroup      string // log group name
 
-	certPath string //	generate cert.pem
-	keyPath  string //	generate key.pem
+	tlsCertPath string // tls cert.pem, relative or absolute path, relative path from execute file root directory
+	tlsKeyPath  string // tls key.pem
+	tlsPort     int    // tls run prot, default server port+1
+	tlsAloneRun bool   // are leafveingo alone run tls server
 
 	// is ResponseWriter writer compress gizp...
 	// According Accept-Encoding select compress type
@@ -263,6 +276,7 @@ type LeafveinServer struct {
 	memTemplateDir string       // memory storage
 	prefix         string       // http url prefix
 	listener       net.Listener // current http listener
+	tlsListener    net.Listener // tls listener
 	isDevel        bool         // developer mode
 	isStart        bool         // is start
 
@@ -377,7 +391,7 @@ func (lv *LeafveinServer) configReload(cf *Config) {
 	lv.SetCompactHTML(cf.IsCompactHTML)
 	lv.SetLogConfigPath(cf.LogConfigPath)
 	lv.SetLogGroup(cf.LogGroup)
-
+	lv.SetHttpTLS(cf.TLSCertPath, cf.TLSKeyPath, cf.TLSPort, cf.TLSAloneRun)
 }
 
 /**
@@ -499,7 +513,6 @@ func (lv *LeafveinServer) start(startName string) {
 		return
 	}
 
-	//	打印启动信息
 	addr := lv.addr
 	if 0 < lv.port {
 		addr = fmt.Sprintf("%s:%d", lv.addr, lv.port)
@@ -510,12 +523,15 @@ func (lv *LeafveinServer) start(startName string) {
 
 	//	由于addr设置为127.0.0.1的时候就只能允许内网进行http://localhost:(port)/进行访问，本机IP访问不了。
 	//	为了友好的显示，如果addr设置为空的时候允许IP或localhost进行访问做了特别的显示除了（http://0.0.0.0:8080）
+	logAddr := ""
+	logTLSAddr := ""
 	if strings.Index(addr, ":") == 0 {
-		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://0.0.0.0%v \n", startName, lv.port, addr)
+		logAddr = "http://0.0.0.0" + addr
+		logTLSAddr = "https://0.0.0.0"
 	} else {
-		logInfo += fmt.Sprintf("Leafveingo %v to listen on %v. Go to http://%v \n", startName, lv.port, addr)
+		logAddr = "http://" + addr
+		logTLSAddr = "https://" + lv.addr
 	}
-	lv.log.Info(logInfo)
 
 	// server and listen
 	server := &http.Server{
@@ -530,22 +546,93 @@ func (lv *LeafveinServer) start(startName string) {
 		lv.log.Fatal("Leafveingo %v Listen: %v \n", startName, err)
 		return
 	}
+	lv.listener = leafveinListener{netListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD}
 
-	if 0 != len(lv.certPath) && 0 != len(lv.keyPath) {
-		//	TODO SSL Handle
-		//	http://golang.org/src/pkg/net/http/server.go?#L1823
-	} else {
+	if 0 != len(lv.tlsCertPath) && 0 != len(lv.tlsKeyPath) {
+		// tls handle, see http://golang.org/src/pkg/net/http/server.go?#L1823
+
+		certFullpath := lv.tlsCertPath
+		if !filepath.IsAbs(certFullpath) {
+			certFullpath = filepath.Join(SFFileManager.GetExecDir(), lv.tlsCertPath)
+		}
+		keyFullpath := lv.tlsKeyPath
+		if !filepath.IsAbs(keyFullpath) {
+			keyFullpath = filepath.Join(SFFileManager.GetExecDir(), lv.tlsKeyPath)
+		}
+
+		certPEMBlock, err := ioutil.ReadFile(certFullpath)
+		if nil != err {
+			lv.log.Fatal("Leafveingo %v Serve Read SSL cert file: %v \n", startName, err)
+			return
+		}
+		keyPEMBlock, err := ioutil.ReadFile(keyFullpath)
+		if nil != err {
+			lv.log.Fatal("Leafveingo %v Serve Read SSL key file: %v \n", startName, err)
+			return
+		}
+
+		if 0 == lv.tlsPort {
+			lv.tlsPort = lv.port + 1
+		}
+
+		tlsServer := &http.Server{
+			Addr:         fmt.Sprintf("%s:%d", lv.addr, lv.tlsPort),
+			Handler:      lv,
+			ReadTimeout:  time.Duration(lv.serverTimeout) * time.Second,
+			WriteTimeout: time.Duration(lv.serverTimeout) * time.Second,
+		}
+
+		tlsServer.TLSConfig = new(tls.Config)
+		tlsServer.TLSConfig.NextProtos = []string{"http/1.1"}
+		tlsServer.TLSConfig.Certificates = make([]tls.Certificate, 1)
+		tlsServer.TLSConfig.Certificates[0], err = tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+		if nil != err {
+			lv.log.Fatal("Leafveingo %v TLS Serve: %v \n", startName, err)
+			return
+		}
+
+		tlsListen, err := net.Listen("tcp", tlsServer.Addr)
+		if err != nil {
+			lv.log.Fatal("Leafveingo %v TLS Listen: %v \n", startName, err)
+			return
+		}
+
+		lvListener := leafveinListener{tlsListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD}
+		lv.tlsListener = tls.NewListener(lvListener, tlsServer.TLSConfig)
+
+		if !lv.tlsAloneRun {
+			logInfo += fmt.Sprintf("Leafveingo %v to Listen on %v. Go to %v \n", startName, lv.port, logAddr)
+			go func() {
+				err = server.Serve(lv.listener)
+				if err != nil {
+					lv.log.Fatal("Leafveingo %v Serve: %v \n", startName, err)
+				}
+			}()
+		} else {
+			lv.listener = nil
+		}
+
+		logInfo += fmt.Sprintf("Leafveingo %v to TLS Listen on %v. Go to %v \n", startName, lv.tlsPort, logTLSAddr)
+		lv.log.Info(logInfo)
+
 		lv.isStart = true
+		err = tlsServer.Serve(lv.tlsListener)
+		if err != nil {
+			lv.log.Fatal("Leafveingo %v TLS Serve: %v \n", startName, err)
+			lv.isStart = false
+		}
 
-		lv.listener = leafveinListener{netListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD}
+	} else {
+		logInfo += fmt.Sprintf("Leafveingo %v to Listen on %v. Go to %v \n", startName, lv.port, logAddr)
+		lv.log.Info(logInfo)
+
+		lv.isStart = true
 		err = server.Serve(lv.listener)
-
 		if err != nil {
 			lv.log.Fatal("Leafveingo %v Serve: %v \n", startName, err)
 			lv.isStart = false
 		}
 	}
-
 }
 
 /**
@@ -632,12 +719,26 @@ func (lv *LeafveinServer) requestURLHandle(rw http.ResponseWriter, req *http.Req
 
 	hostsCount := len(lv.multiProjectHosts)
 	if 0 != hostsCount {
-		reqHost = SFStringsUtil.ToLower(req.URL.Host)
+		reqHost = SFStringsUtil.ToLower(req.Host)
 		reqHostLen := len(reqHost)
 
+		if 0 == reqHostLen {
+			pass = false
+			errorMsg := ""
+			if lv.IsDevel() {
+				errorMsg = "Request Host null"
+			}
+			lv.statusPageWriter(NewHttpStatusValue(Status400, Status400Msg, errorMsg, ""), rw)
+			return
+		}
+
 		//	remove port
+		retScope := reqHostLen - 7
+		if 0 > retScope {
+			retScope = 0
+		}
 		index := -1
-		for i := reqHostLen - 1; i >= reqHostLen-7; i-- {
+		for i := reqHostLen - 1; i >= retScope; i-- {
 			if ':' == reqHost[i] {
 				index = i
 				break
@@ -673,7 +774,11 @@ func (lv *LeafveinServer) requestURLHandle(rw http.ResponseWriter, req *http.Req
 		}
 
 		if !pass {
-			lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, "Host("+reqHost+") invalid", ""), rw)
+			errorMsg := ""
+			if lv.IsDevel() {
+				errorMsg = "Host(" + req.Host + ") invalid"
+			}
+			lv.statusPageWriter(NewHttpStatusValue(Status404, Status404Msg, errorMsg, ""), rw)
 			return
 		}
 	}
@@ -1340,6 +1445,49 @@ func (lv *LeafveinServer) Log() *SFLog.SFLogger {
 	return lv.log
 }
 
+/**
+ *	set tls run params cert.pem and key.pem
+ *	Note: need to restart Leafvein Server
+ *
+ *	@param cretpath  relative or absolute path, relative path from execute file root directory
+ *	@param keypath
+ *	@param port 	 tls run port
+ *	@param aloneRun	 true is alone run tls server
+ */
+func (lv *LeafveinServer) SetHttpTLS(cretpath, keypath string, port int, aloneRun bool) {
+	lv.tlsKeyPath = keypath
+	lv.tlsCertPath = cretpath
+	lv.tlsPort = port
+	lv.tlsAloneRun = aloneRun
+}
+
+/**
+ *	get tls cert.pem file path
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) TLSCertPath() string {
+	return lv.tlsCertPath
+}
+
+/**
+ *	get tls key.pem file path
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) TLSKeyPath() string {
+	return lv.tlsKeyPath
+}
+
+/**
+ *	get tls run port
+ *
+ *	@return
+ */
+func (lv *LeafveinServer) TLSPort() int {
+	return lv.tlsPort
+}
+
 //# mark LeafveinHttp override method -------------------------------------------------------------------------------------------
 
 /**
@@ -1373,7 +1521,6 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//	create context
 	context = newContext(lv, rw, req, lv.isRespWriteCompress)
 	context.reqHost = reqHost
-	context.reqScheme = SFStringsUtil.ToLower(req.URL.Scheme)
 
 	//	router parse
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)

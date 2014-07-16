@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-11-06
-//  Update on 2014-07-10
+//  Update on 2014-07-15
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -75,6 +75,11 @@ var (
 		"LogConfigPath"			:"config/log.conf",
 		"LogGroup" 				:"",
 
+		"TLSCertPath"			:"",
+		"TLSKeyPath"			:"",
+		"TLSPort"				:0,
+		"TLSAloneRun"			:false,
+		
 		"IsRespWriteCompress"	:true,
 		
 		"UserData"				:{}
@@ -101,6 +106,11 @@ type Config struct {
 
 	LogConfigPath string // log config path, relative or absolute path, relative path from execute file root directory
 	LogGroup      string // log group name
+
+	TLSCertPath string // tls cert.pem, relative or absolute path, relative path from execute file root directory
+	TLSKeyPath  string // tls key.pem
+	TLSPort     int    // tls run prot, default server port+1
+	TLSAloneRun bool   // are leafveingo alone run tls server, default false
 
 	// is ResponseWriter writer compress gizp...
 	// According Accept-Encoding select compress type
