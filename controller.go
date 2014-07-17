@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-16
-//  Update on 2014-07-08
+//  Update on 2014-07-17
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -40,8 +40,8 @@ var (
 //#pragma mark interface option ----------------------------------------------------------------------------------------------------
 
 type ControllerOption struct {
-	scheme string // "http" || "https" || ""(wildcard)
-	host   string // "svn.slowfei.com" || "wwww.slowfei.com" || "slowfei.com" || ""(wildcard)
+	scheme URIScheme // the support scheme URI_SCHEME_HTTPS || URI_SCHEME_HTTP
+	host   string    // "svn.slowfei.com" || "wwww.slowfei.com" || "slowfei.com" || ""(wildcard)
 }
 
 /**
@@ -49,15 +49,16 @@ type ControllerOption struct {
  *
  *	@return
  */
-func (c ControllerOption) Scheme() string {
+func (c ControllerOption) Scheme() URIScheme {
 	return c.scheme
 }
 
 /**
- *	set scheme
- *	"http" || "https" || ""(wildcard)
+ *	set the support scheme
+ *
+ *	URI_SCHEME_HTTPS | URI_SCHEME_HTTP
  */
-func (c *ControllerOption) SetScheme(scheme string) {
+func (c *ControllerOption) SetScheme(scheme URIScheme) {
 	c.scheme = scheme
 }
 

@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2014-06-16
-//  Update on 2014-07-10
+//  Update on 2014-07-17
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -46,15 +46,16 @@ type ReflectRouterOption struct {
 func DefaultReflectRouterOption() ReflectRouterOption {
 	option := ReflectRouterOption{}
 	option.ControllerOption.SetHost("")
-	option.ControllerOption.SetScheme("")
+	option.ControllerOption.SetScheme(URI_SCHEME_HTTP | URI_SCHEME_HTTPS)
 	return option
 }
 
 /**
- *	set scheme
- *	"http" || "https" || ""(wildcard)
+ *	set the support scheme
+ *
+ *	URI_SCHEME_HTTP | URI_SCHEME_HTTPS
  */
-func (o ReflectRouterOption) SetScheme(scheme string) ReflectRouterOption {
+func (o ReflectRouterOption) SetScheme(scheme URIScheme) ReflectRouterOption {
 	o.ControllerOption.SetScheme(scheme)
 	return o
 }

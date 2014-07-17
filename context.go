@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-13
-//  Update on 2014-07-12
+//  Update on 2014-07-17
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -46,7 +46,7 @@ type HttpContext struct {
 	reqBody         []byte                //
 	session         LVSession.HttpSession //
 	reqHost         string                // request host lowercase, integrated multi-project use.
-	reqScheme       string                // request scheme lowercase
+	reqScheme       URIScheme             // request uri scheme
 	routerElement   *RouterElement        // router list element
 	routerKeys      []string              // router keys
 	funcNames       []string              // request controller method names
@@ -85,20 +85,27 @@ func newContext(server *LeafveinServer, rw http.ResponseWriter, req *http.Reques
 		outWrite = rw
 	}
 
-	contenxt := new(HttpContext)
-	contenxt.lvServer = server
-	contenxt.RespWrite = rw
-	contenxt.Request = req
-	contenxt.reqBody = nil
-	contenxt.session = nil
-	contenxt.contentEncoding = encoding
-	contenxt.comperssWriter = outWrite
-	contenxt.isCloseWriter = false
-	contenxt.isParseForm = false
-	contenxt.formparamErr = nil
-	contenxt.formparams = nil
+	context := new(HttpContext)
+	context.lvServer = server
+	context.RespWrite = rw
+	context.Request = req
+	context.reqBody = nil
+	context.session = nil
+	context.contentEncoding = encoding
+	context.comperssWriter = outWrite
+	context.isCloseWriter = false
+	context.isParseForm = false
+	context.formparamErr = nil
+	context.formparams = nil
 
-	return contenxt
+	//	TODO 有待修改，看如何获取scheme
+	if nil != req.TLS {
+		context.reqScheme = URI_SCHEME_HTTPS
+	} else {
+		context.reqScheme = URI_SCHEME_HTTP
+	}
+
+	return context
 }
 
 /**
@@ -534,11 +541,11 @@ func (ctx *HttpContext) RequestHost() string {
 }
 
 /**
- *	request scheme
+ *	request uri scheme
  *
- *	@return lowercase string
+ *	@return URIScheme
  */
-func (ctx *HttpContext) RequestScheme() string {
+func (ctx *HttpContext) RequestScheme() URIScheme {
 	return ctx.reqScheme
 }
 

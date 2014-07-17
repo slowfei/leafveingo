@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-9-14
-//  Update on 2014-07-02
+//  Update on 2014-07-17
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -23,7 +23,10 @@
 package leafveingo
 
 import (
+	// "github.com/slowfei/gosfcore/debug"
+	"fmt"
 	"github.com/slowfei/gosfcore/utils/strings"
+	"net/http"
 	"reflect"
 )
 
@@ -60,7 +63,6 @@ func AddRouter(appName string, router IRouter) {
 //
 type RouterElement struct {
 	host       string
-	scheme     string
 	routerKeys []string
 	routers    map[string]IRouter
 }
@@ -215,12 +217,6 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 
 		if context.reqHost == element.host {
 
-			if 0 != len(element.scheme) && context.reqScheme != element.scheme {
-				//	TODO 如果scheme与控制器要求访问的scheme不相同考虑重定向。
-				statusCode = Status404
-				return
-			}
-
 			keyCount := len(element.routerKeys)
 			for j := 0; j < keyCount; j++ {
 
@@ -229,11 +225,19 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 
 				if keyLen <= reqPathLen && key == lowerReqPath[:keyLen] {
 
+					//	controller router find
 					if iR, ok := element.routers[key]; ok {
-						statusCode = Status200
-						router = iR
-						context.routerElement = element
 
+						//	uri scheme handle
+						statusCode = routerSchemeHandle(context, iR.ControllerOption().Scheme())
+						if statusCode != Status200 {
+							router = nil
+							option = nil
+							return
+						}
+
+						context.routerElement = element
+						router = iR
 						option = new(RouterOption)
 						option.AppName = context.lvServer.AppName()
 
@@ -269,4 +273,117 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
 	} // end i := 0; i < listCount; i++
 
 	return
+}
+
+/**
+ *	router uri scheme handle
+ *
+ *	@param context
+ *	@param scheme
+ *	@return statusCode Status200 pass
+ */
+func routerSchemeHandle(context *HttpContext, scheme URIScheme) (statusCode HttpStatus) {
+	statusCode = Status403
+
+	switch context.RequestScheme() {
+	case URI_SCHEME_HTTP:
+
+		if scheme&URI_SCHEME_HTTP == URI_SCHEME_HTTP {
+			statusCode = Status200
+			break
+		}
+
+		//	TODO 下一步考虑委托函数处理不支持的协议，可让用户来处理。
+
+		if scheme&URI_SCHEME_HTTPS == URI_SCHEME_HTTPS {
+			if "GET" == context.Request.Method {
+				//	重定向操作
+				statusCode = StatusNil
+				routerSchemeRedirect(context, URI_SCHEME_HTTPS)
+			}
+		}
+
+	case URI_SCHEME_HTTPS:
+		if scheme&URI_SCHEME_HTTPS == URI_SCHEME_HTTPS {
+			statusCode = Status200
+			break
+		}
+
+		if scheme&URI_SCHEME_HTTP == URI_SCHEME_HTTP {
+			if "GET" == context.Request.Method {
+				//	重定向操作
+				statusCode = StatusNil
+				routerSchemeRedirect(context, URI_SCHEME_HTTP)
+			}
+		}
+
+	default:
+
+	}
+
+	return
+}
+
+/**
+ *	does not support the scheme redirect handle
+ *
+ *	@param context
+ *	@param scheme
+ */
+func routerSchemeRedirect(context *HttpContext, scheme URIScheme) {
+	schemeStr := ""
+	port := 0
+
+	switch scheme {
+	case URI_SCHEME_HTTP:
+		schemeStr = "http://"
+		port = context.lvServer.port
+	case URI_SCHEME_HTTPS:
+		if nil == context.lvServer.tlsListener {
+			return
+		}
+		schemeStr = "https://"
+		port = context.lvServer.tlsPort
+	default:
+		return
+	}
+
+	//	host
+	host := context.Request.Host
+	hostLen := len(host)
+
+	//	remove port
+	retScope := hostLen - 7
+	if 0 > retScope {
+		retScope = 0
+	}
+	index := -1
+	for i := hostLen - 1; i >= retScope; i-- {
+		if ':' == host[i] {
+			index = i
+			break
+		}
+	}
+	if -1 != index {
+		host = fmt.Sprintf("%s:%d", host[:index], port)
+	}
+
+	//	path
+	path := context.Request.URL.Path
+	if 0 == len(path) {
+		path = "/"
+	} else if '/' != path[0] {
+		path = "/" + path
+	}
+
+	query := context.Request.URL.Query().Encode()
+	if 0 != len(query) {
+		query = "?" + query
+	}
+
+	urlstr := schemeStr + host + path + query
+
+	http.Redirect(context.RespWrite, context.Request, urlstr, int(Status302))
+
+	context.LVServer().Log().Debug("scheme redirect to: " + urlstr)
 }

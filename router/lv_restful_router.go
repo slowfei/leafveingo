@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2014-06-30
-//  Update on 2014-07-08
+//  Update on 2014-07-17
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -103,21 +103,23 @@ type RESTfulRouterOption struct {
 func DefaultRESTfulRouterOption() RESTfulRouterOption {
 	option := RESTfulRouterOption{}
 	option.ControllerOption.SetHost("")
-	option.ControllerOption.SetScheme("")
+	option.ControllerOption.SetScheme(URI_SCHEME_HTTP | URI_SCHEME_HTTPS)
 	return option
 }
 
 /**
- *	set scheme
- *	"http" || "https" || ""(wildcard)
+ *	set the support scheme
+ *
+ *	URI_SCHEME_HTTP | URI_SCHEME_HTTPS
  */
-func (o RESTfulRouterOption) SetScheme(scheme string) RESTfulRouterOption {
+func (o RESTfulRouterOption) SetScheme(scheme URIScheme) RESTfulRouterOption {
 	o.ControllerOption.SetScheme(scheme)
 	return o
 }
 
 /**
  *	set host
+ *
  *	"svn.slowfei.com" || "wwww.slowfei.com" || ""(wildcard)
  */
 func (o RESTfulRouterOption) SetHost(host string) RESTfulRouterOption {

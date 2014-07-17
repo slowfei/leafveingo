@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2014-07-15
+//  Update on 2014-07-17
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
@@ -66,13 +66,13 @@ const (
 	//	url params host key
 	URL_HOST_KEY = "host"
 
-	//	http protocol
-	HTTP_PROTO_HTTP1  = HttpProto(1) // HTTP/1.0
-	HTTP_PROTO_HTTP11 = HttpProto(2) // HTTP/1.1(https) client requests always use
-
 	//	hosts www
 	URL_HOST_WWW     = "www."
 	URL_HOST_WWW_LEN = 4
+
+	//	uri schemes
+	URI_SCHEME_HTTP  = URIScheme(1) // http
+	URI_SCHEME_HTTPS = URIScheme(2) // https
 )
 
 var (
@@ -138,9 +138,38 @@ func addServerList(server *LeafveinServer) {
 	_serverList = append(_serverList, server)
 }
 
-//#pragma mark HTTP protocol type	----------------------------------------------------------------------------------------------------
+//#pragma mark uri scheme type	----------------------------------------------------------------------------------------------------
 
-type HttpProto int
+//
+//	uri scheme
+//
+type URIScheme int
+
+/**
+ *	scheme string
+ *
+ *	@return string tag
+ */
+func (u URIScheme) String() string {
+	result := ""
+	comma := false
+
+	if u&URI_SCHEME_HTTP == URI_SCHEME_HTTP {
+		result += "http"
+		comma = true
+	}
+
+	if u&URI_SCHEME_HTTPS == URI_SCHEME_HTTPS {
+		if comma {
+			result += ",https"
+		} else {
+			result += "https"
+		}
+		comma = true
+	}
+
+	return result
+}
 
 //#pragma mark ServerOption struct	----------------------------------------------------------------------------------------------------
 
@@ -597,9 +626,7 @@ func (lv *LeafveinServer) start(startName string) {
 			return
 		}
 
-		lvListener := leafveinListener{tlsListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD}
-		lv.tlsListener = tls.NewListener(lvListener, tlsServer.TLSConfig)
-
+		//	http start
 		if !lv.tlsAloneRun {
 			logInfo += fmt.Sprintf("Leafveingo %v to Listen on %v. Go to %v \n", startName, lv.port, logAddr)
 			go func() {
@@ -612,7 +639,11 @@ func (lv *LeafveinServer) start(startName string) {
 			lv.listener = nil
 		}
 
-		logInfo += fmt.Sprintf("Leafveingo %v to TLS Listen on %v. Go to %v \n", startName, lv.tlsPort, logTLSAddr)
+		//	tls start
+		lvListener := leafveinListener{tlsListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD}
+		lv.tlsListener = tls.NewListener(lvListener, tlsServer.TLSConfig)
+
+		logInfo += fmt.Sprintf("Leafveingo %v to TLS Listen on %v. Go to %v:%v \n", startName, lv.tlsPort, logTLSAddr, lv.tlsPort)
 		lv.log.Info(logInfo)
 
 		lv.isStart = true
@@ -960,7 +991,6 @@ func (lv *LeafveinServer) AddRouter(router IRouter) {
 	if nil == element {
 		element = new(RouterElement)
 		element.host = controllerHost
-		element.scheme = router.ControllerOption().Scheme()
 		element.routers = make(map[string]IRouter)
 		lv.routerList = append(lv.routerList, element)
 	}
@@ -1526,9 +1556,9 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)
 
 	if nil != option {
-		lv.log.Info("request info: [%s,%s][%s,%s,%d]%#v %#v ", context.reqScheme, reqHost, option.RequestMethod, option.RouterKey, statusCode, reqPath, option.RouterPath)
+		lv.log.Info("request info: [%s,%s][%s,%s,%d]%#v %#v ", context.RequestScheme().String(), reqHost, option.RequestMethod, option.RouterKey, statusCode, reqPath, option.RouterPath)
 	} else {
-		lv.log.Info("request info: [%s,%s][%s,nil,%d]%#v ", context.reqScheme, reqHost, req.Method, statusCode, reqPath)
+		lv.log.Info("request info: [%s,%s][%s,nil,%d]%#v ", context.RequestScheme().String(), reqHost, req.Method, statusCode, reqPath)
 	}
 
 	errstr := ""
@@ -1563,7 +1593,8 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				context.StatusPageWrite(statusCode, StatusMsg(statusCode), "", "")
 			}
 		}
-	} else {
+
+	} else if statusCode != StatusNil {
 		if lv.IsDevel() {
 			context.StatusPageWrite(statusCode, StatusMsg(statusCode), errstr, "")
 		} else {

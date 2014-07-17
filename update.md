@@ -16,6 +16,7 @@ Leafveingo update log
 > * response_body.go 微调整
 > * leafveingo.go 重新设计构架
 > * (新增)lv_reflect_router.go 反射路由接口实现
+> * (新增)https的支持，可与http一起使用(不同端口处理)
 > * samlpe案例整改后重新修订完成
 
 1. 
