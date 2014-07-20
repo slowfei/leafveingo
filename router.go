@@ -283,7 +283,7 @@ func routerParse(context *HttpContext, reqPathNoSuffix, reqSuffix string) (route
  *	@return statusCode Status200 pass
  */
 func routerSchemeHandle(context *HttpContext, scheme URIScheme) (statusCode HttpStatus) {
-	statusCode = Status403
+	statusCode = Status400
 
 	switch context.RequestScheme() {
 	case URI_SCHEME_HTTP:

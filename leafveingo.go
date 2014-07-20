@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2014-07-17
+//  Update on 2014-07-21
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
@@ -516,9 +516,9 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 	for _, element := range lv.routerList {
 		for _, key := range element.routerKeys {
 			if router, ok := element.routers[key]; ok {
-				*logInfo += fmt.Sprintf("host:[%#v] key:[%#v] %v\n", element.host, key, router.Info())
+				*logInfo += fmt.Sprintf("host:[%#v][%v] key:[%#v] %v\n", element.host, router.ControllerOption().Scheme().String(), key, router.Info())
 			} else {
-				*logInfo += fmt.Sprintf("host:[%#v] key:[%#v] controller stores error.", element.host, key)
+				*logInfo += fmt.Sprintf("schemes[%v][%v] host:[%#v] key:[%#v] controller stores error.", element.host, router.ControllerOption().Scheme().String(), key)
 			}
 		}
 	}
@@ -575,7 +575,7 @@ func (lv *LeafveinServer) start(startName string) {
 		lv.log.Fatal("Leafveingo %v Listen: %v \n", startName, err)
 		return
 	}
-	lv.listener = leafveinListener{netListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD}
+	lv.listener = &leafveinListener{netListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD, nil}
 
 	if 0 != len(lv.tlsCertPath) && 0 != len(lv.tlsKeyPath) {
 		// tls handle, see http://golang.org/src/pkg/net/http/server.go?#L1823
@@ -640,8 +640,7 @@ func (lv *LeafveinServer) start(startName string) {
 		}
 
 		//	tls start
-		lvListener := leafveinListener{tlsListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD}
-		lv.tlsListener = tls.NewListener(lvListener, tlsServer.TLSConfig)
+		lv.tlsListener = &leafveinListener{tlsListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD, tlsServer.TLSConfig}
 
 		logInfo += fmt.Sprintf("Leafveingo %v to TLS Listen on %v. Go to %v:%v \n", startName, lv.tlsPort, logTLSAddr, lv.tlsPort)
 		lv.log.Info(logInfo)
