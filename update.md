@@ -4,7 +4,8 @@ Leafveingo update log
 
 ####version 0.0.2.000 rc1(欠缺文档)
 1. 重新整理leafveingo
-> * 主要整改：独立端口的Server、灵活的路由接口、在一个端口下也可以整合多个项目
+> * 主要整改：独立端口的Server、灵活的路由接口
+> * 多项目集成，在一个端口下也可以整合多个项目
 > * config.go 重新设计架构
 > * template/lv_template.go 修改初始化操作
 > * session/lv_session.go 修改初始化操作，并且修改sessionManager的引用；增加Free操作
@@ -18,6 +19,7 @@ Leafveingo update log
 > * (新增)lv_reflect_router.go 反射路由接口实现
 > * (新增)https的支持，可与http一起使用(不同端口处理)
 > * samlpe案例整改后重新修订完成
+> * multiproject多项目集成案例
 
 1. 
 
