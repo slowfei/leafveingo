@@ -64,6 +64,9 @@ const (
 	//	这里定义主要用来解决这个问题的处理
 	INDEX_PAGE = "/index.html"
 
+	//
+	FAVICON_PATH = "/favicon.ico"
+
 	//	url params host key
 	URL_HOST_KEY = "host"
 
@@ -922,6 +925,12 @@ func (lv *LeafveinServer) staticFileHandle(rw http.ResponseWriter, req *http.Req
 
 			pass = false
 			return
+		} else {
+			// favicon.ico 找不到直接跳过
+			if FAVICON_PATH == reqPath {
+				pass = false
+			}
+
 		}
 		//	查找不到静态文件交由路由器处理
 		// else {
@@ -1636,7 +1645,6 @@ func (lv *LeafveinServer) TLSPort() int {
  *	@param req
  */
 func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	//	TODO 考虑是否加上读取锁，等测试性能后加上再测试看看。
 
 	var context *HttpContext = nil
 	reqPath := req.URL.Path

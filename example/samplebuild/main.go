@@ -70,7 +70,11 @@ func GetLeafveinServer(option leafveingo.ServerOption) *leafveingo.LeafveinServe
 
 func main() {
 
-	//	创建Server
+	/*
+		-------------------------------------------------------------------
+		基本案例演示，启动后浏览器打开地址：http://localhost:8080/index.html
+		-------------------------------------------------------------------
+	*/
 
 	//	server oprion
 	//
@@ -79,6 +83,7 @@ func main() {
 	// SetPort(8080)                           // optional default 8080
 	// SetSMGCTime(300)                        // optional default 300, set 0 not use http session.
 	option := leafveingo.DefaultOption().SetConfigPath("sample/config/app.conf").SetAddr("127.0.0.1").SetPort(8080).SetSMGCTime(300)
+	//	create server
 	server := GetLeafveinServer(option)
 
 	//	当前主要演示反射路由，详情可以查看 https://github.com/slowfei/leafveingo/blob/master/router/lv_reflect_router.go
@@ -120,5 +125,5 @@ func main() {
 	server.AddRouter(router.CreateReflectController("/sp/", StatusController{}))
 
 	//	启动
-	server.Start()
+	leafveingo.Start()
 }

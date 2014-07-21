@@ -64,9 +64,11 @@ package main
 
 import (
 	"github.com/slowfei/leafveingo"
+	router "github.com/slowfei/leafveingo/router"
 )
 
 type MainController struct {
+	tag string
 }
 
 //	控制器的默认请求访问的函数(Index)，URL结尾检测为"/"( http://localhost:8080/ )
@@ -75,23 +77,22 @@ func (m *MainController) Index() string {
 }
 
 func main() {
-	//	获取Leafveingo
-	leafvein := leafveingo.SharedLeafvein()
+	//	创建服务
+	server := leafveingo.NewLeafveinServer("sample", leafveingo.DefaultOption())
 
-	// 需要在项目的编译目录下，建立个与AppName一样的目录和webRoot目录，默认名称LeafveingoWeb
-	// 具体可以看下(开发项目组织结构)
-	leafvein.SetAppName("sample")
-
-	// 原型：AddController(routerKey string, controller interface{})
-
-	leafvein.AddController("/", MainController{})
+	//	添加控制器
+	server.AddRouter(router.CreateReflectController("/", MainController{}))
 	
 	//	启动
-	leafvein.Start()
+	leafveingo.Start()
 }
 
 ```
-go build 编译后运行编译出来的文件，然后在浏览器中打开：`http://localhost:8080/` 这样就会默认进入到MainController的Index函数中。
+go build 编译可执行文件(samplebuild)
+
+可选择开发模式运行(加上参数-devel)：`./samplebuild -devel` 
+
+然后在浏览器中打开：`http://localhost:8080/` 这样就会默认进入到MainController的Index函数中。
 
 然后浏览器中会输出：Hello world, Leafvingo web framework
 
