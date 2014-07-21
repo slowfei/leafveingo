@@ -28,7 +28,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	// "github.com/slowfei/gosfcore/debug"
+	"github.com/slowfei/gosfcore/debug"
 	"github.com/slowfei/gosfcore/helper"
 	"github.com/slowfei/gosfcore/log"
 	"github.com/slowfei/gosfcore/utils/filemanager"
@@ -45,6 +45,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -79,14 +80,11 @@ var (
 	//	开发模式命令
 	FlagDeveloper bool
 
-	//	TODO Remove
-	// _rexW = regexp.MustCompile("\\w+")
-
 	//	init server memory list
 	_serverList []*LeafveinServer = nil
 
-	//	temp storage router
-
+	//
+	_serverWaitGroup *sync.WaitGroup = nil
 )
 
 func init() {
@@ -94,6 +92,43 @@ func init() {
 }
 
 //#pragma mark leafveingo func	----------------------------------------------------------------------------------------------------
+
+/**
+ *	global start all leafvein server
+ *
+ */
+func Start() {
+	if 0 == len(_serverList) {
+		SFLog.Fatal("no to start the leafvein server.")
+		return
+	}
+
+	_serverWaitGroup = new(sync.WaitGroup)
+
+	count := len(_serverList)
+	for i := 0; i < count; i++ {
+		server := _serverList[i]
+		server.Start(true)
+	}
+
+	_serverWaitGroup.Wait()
+}
+
+/**
+ *	global close all leafvein server
+ *
+ */
+func Close() {
+	if 0 == len(_serverList) {
+		SFLog.Fatal("no to close the leafvein server.")
+		return
+	}
+	count := len(_serverList)
+	for i := 0; i < count; i++ {
+		server := _serverList[i]
+		server.Close()
+	}
+}
 
 func SetLogManager(channelSize int) {
 	// SFLog.StartLogManager(lv.logChannelSize)
@@ -295,7 +330,8 @@ type LeafveinServer struct {
 	application    *SFHelper.Map                 //	application
 	sessionManager *LVSession.HttpSessionManager //	http session manager
 	template       *LVTemplate.Template          //	template
-	log            *SFLog.SFLogger
+	log            *SFLog.SFLogger               // log
+	config         *Config                       // config info
 
 	//	current leafveingo the file operation directory
 	//	operatingDir 是根据 appName 建立的目录路径
@@ -347,18 +383,19 @@ func (lv *LeafveinServer) initPrivate(option ServerOption) {
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_APP_VERSION, lv.AppVersion)
 	lv.template.SetFunc(TEMPLATE_FUNC_KEY_IS_DEVEL, lv.IsDevel)
 
+	lv.config = new(Config)
 	lv.configLoadDefault()
 
 	//	config handle
 	if 0 != len(option.ConfigPath) {
-		config, err := configLoadByFilepath(option.ConfigPath)
+		err := configLoadByFilepath(option.ConfigPath, lv.config)
 		if nil != err {
 			lilcErr := *ErrLeafveinInitLoadConfig
 			lilcErr.UserInfo = err.Error()
 			panic(&lilcErr)
 			return
 		}
-		lv.configReload(config)
+		lv.configReload(lv.config)
 	}
 
 	lv.isStart = false
@@ -386,14 +423,15 @@ func (lv *LeafveinServer) free() {
  *	load default config info
  */
 func (lv *LeafveinServer) configLoadDefault() {
-	config, err := configLoadByJson([]byte(_defaultConfigJson))
+
+	err := configLoadByJson([]byte(_defaultConfigJson), lv.config)
 	if nil != err {
 		lldcErr := *ErrLeafveinLoadDefaultConfig
 		lldcErr.UserInfo = err.Error()
 		panic(&lldcErr)
 		return
 	}
-	lv.configReload(config)
+	lv.configReload(lv.config)
 }
 
 /**
@@ -510,6 +548,11 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 		lv.log.Warn("not locate the %v directory, will not be able to read a static file resource and upload file. \n  need to create directory: %v \n", lv.WebRootDir(), lv.WebRootDir())
 	}
 
+	//	print config info
+	configBuf := bytes.NewBufferString("")
+	SFDebug.Fdump(configBuf, true, lv.config)
+	*logInfo += "config:\n" + configBuf.String()
+
 	//	print log info
 	*logInfo += "controller:\n"
 
@@ -531,24 +574,27 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 /**
  *	start leafvein server
  *
- *	@param startName "DevelStart" or "Start" or "HandlerFunc"
+ *	@param startName "DevelStart" or "Start"
+ *	@param goroutine
  */
-func (lv *LeafveinServer) start(startName string) {
+func (lv *LeafveinServer) start(startName string, goroutine bool) {
+	if lv.IsStart() {
+		return
+	}
+	var runFunc func() = nil
+	var defaultServer *http.Server = nil
 
 	//	start info
-	logInfo := fmt.Sprintf("Leafvein %v...\n", startName)
+	logInfo := fmt.Sprintf("(%v)Leafvein %v...\n", lv.AppName(), startName)
 
 	if !lv.parseRouter(&logInfo, startName) {
 		return
 	}
 
-	addr := lv.addr
-	if 0 < lv.port {
-		addr = fmt.Sprintf("%s:%d", lv.addr, lv.port)
+	if 0 >= lv.port {
+		lv.port = 8080
 	}
-	if addr == "" {
-		addr = fmt.Sprintf(":%d", 8080)
-	}
+	addr := fmt.Sprintf("%s:%d", lv.addr, lv.port)
 
 	//	由于addr设置为127.0.0.1的时候就只能允许内网进行http://localhost:(port)/进行访问，本机IP访问不了。
 	//	为了友好的显示，如果addr设置为空的时候允许IP或localhost进行访问做了特别的显示除了（http://0.0.0.0:8080）
@@ -562,23 +608,26 @@ func (lv *LeafveinServer) start(startName string) {
 		logTLSAddr = "https://" + lv.addr
 	}
 
-	// server and listen
-	server := &http.Server{
-		Addr:         addr,
-		Handler:      lv,
-		ReadTimeout:  time.Duration(lv.serverTimeout) * time.Second,
-		WriteTimeout: time.Duration(lv.serverTimeout) * time.Second,
+	if 0 == len(lv.tlsCertPath) || 0 == len(lv.tlsKeyPath) || !lv.tlsAloneRun {
+		// default server and listen
+		defaultServer = &http.Server{
+			Addr:         addr,
+			Handler:      lv,
+			ReadTimeout:  time.Duration(lv.serverTimeout) * time.Second,
+			WriteTimeout: time.Duration(lv.serverTimeout) * time.Second,
+		}
+
+		netListen, err := net.Listen("tcp", addr)
+		if err != nil {
+			lv.log.Fatal("(%v) %v Listen: %v \n", lv.appName, startName, err)
+			return
+		}
+		lv.listener = &leafveinListener{netListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD, nil}
 	}
 
-	netListen, err := net.Listen("tcp", addr)
-	if err != nil {
-		lv.log.Fatal("Leafveingo %v Listen: %v \n", startName, err)
-		return
-	}
-	lv.listener = &leafveinListener{netListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD, nil}
-
+	//	handle tls
 	if 0 != len(lv.tlsCertPath) && 0 != len(lv.tlsKeyPath) {
-		// tls handle, see http://golang.org/src/pkg/net/http/server.go?#L1823
+		// see http://golang.org/src/pkg/net/http/server.go?#L1823
 
 		certFullpath := lv.tlsCertPath
 		if !filepath.IsAbs(certFullpath) {
@@ -591,12 +640,12 @@ func (lv *LeafveinServer) start(startName string) {
 
 		certPEMBlock, err := ioutil.ReadFile(certFullpath)
 		if nil != err {
-			lv.log.Fatal("Leafveingo %v Serve Read SSL cert file: %v \n", startName, err)
+			lv.log.Fatal("(%v) %v Serve Read SSL cert file: %v \n", lv.appName, startName, err)
 			return
 		}
 		keyPEMBlock, err := ioutil.ReadFile(keyFullpath)
 		if nil != err {
-			lv.log.Fatal("Leafveingo %v Serve Read SSL key file: %v \n", startName, err)
+			lv.log.Fatal("(%v) %v Serve Read SSL key file: %v \n", lv.appName, startName, err)
 			return
 		}
 
@@ -616,52 +665,77 @@ func (lv *LeafveinServer) start(startName string) {
 		tlsServer.TLSConfig.Certificates = make([]tls.Certificate, 1)
 		tlsServer.TLSConfig.Certificates[0], err = tls.X509KeyPair(certPEMBlock, keyPEMBlock)
 		if nil != err {
-			lv.log.Fatal("Leafveingo %v TLS Serve: %v \n", startName, err)
+			lv.log.Fatal("(%v) %v TLS Serve: %v \n", lv.appName, startName, err)
 			return
 		}
 
 		tlsListen, err := net.Listen("tcp", tlsServer.Addr)
 		if err != nil {
-			lv.log.Fatal("Leafveingo %v TLS Listen: %v \n", startName, err)
+			lv.log.Fatal("(%v) %v TLS Listen: %v \n", lv.appName, startName, err)
 			return
 		}
 
 		//	http start
-		if !lv.tlsAloneRun {
-			logInfo += fmt.Sprintf("Leafveingo %v to Listen on %v. Go to %v \n", startName, lv.port, logAddr)
+		if nil != lv.listener && nil != defaultServer {
+			logInfo += fmt.Sprintf("(%v) %v to Listen on %v. Go to %v \n", lv.appName, startName, lv.port, logAddr)
 			go func() {
-				err = server.Serve(lv.listener)
+				err = defaultServer.Serve(lv.listener)
 				if err != nil {
-					lv.log.Fatal("Leafveingo %v Serve: %v \n", startName, err)
+					lv.log.Fatal("(%v) %v Serve: %v \n", lv.appName, startName, err)
 				}
 			}()
-		} else {
-			lv.listener = nil
 		}
 
 		//	tls start
 		lv.tlsListener = &leafveinListener{tlsListen.(*net.TCPListener), DEFAULT_KEEP_ALIVE_PERIOD, tlsServer.TLSConfig}
 
-		logInfo += fmt.Sprintf("Leafveingo %v to TLS Listen on %v. Go to %v:%v \n", startName, lv.tlsPort, logTLSAddr, lv.tlsPort)
+		logInfo += fmt.Sprintf("(%v) %v to TLS Listen on %v. Go to %v:%v \n", lv.appName, startName, lv.tlsPort, logTLSAddr, lv.tlsPort)
 		lv.log.Info(logInfo)
 
-		lv.isStart = true
-		err = tlsServer.Serve(lv.tlsListener)
-		if err != nil {
-			lv.log.Fatal("Leafveingo %v TLS Serve: %v \n", startName, err)
+		runFunc = func() {
+			err = tlsServer.Serve(lv.tlsListener)
+			if err != nil {
+				lv.log.Fatal("(%v) %v TLS Serve: %v \n", lv.appName, startName, err)
+			}
 			lv.isStart = false
+			if nil != _serverWaitGroup {
+				_serverWaitGroup.Done()
+			}
 		}
 
 	} else {
-		logInfo += fmt.Sprintf("Leafveingo %v to Listen on %v. Go to %v \n", startName, lv.port, logAddr)
+
+		if nil == defaultServer || nil == lv.listener {
+			lv.log.Fatal("default server or default listener init nil. port is configured correctly?")
+			return
+		}
+
+		logInfo += fmt.Sprintf("(%v) %v to Listen on %v. Go to %v \n", lv.appName, startName, lv.port, logAddr)
 		lv.log.Info(logInfo)
 
-		lv.isStart = true
-		err = server.Serve(lv.listener)
-		if err != nil {
-			lv.log.Fatal("Leafveingo %v Serve: %v \n", startName, err)
+		runFunc = func() {
+			err := defaultServer.Serve(lv.listener)
+			if err != nil {
+				lv.log.Fatal("(%v) %v Serve: %v \n", lv.appName, startName, err)
+			}
 			lv.isStart = false
+			if nil != _serverWaitGroup {
+				_serverWaitGroup.Done()
+			}
 		}
+
+	}
+
+	//	start server
+	lv.isStart = true
+	if nil != _serverWaitGroup {
+		_serverWaitGroup.Add(1)
+	}
+
+	if goroutine {
+		go runFunc()
+	} else {
+		runFunc()
 	}
 }
 
@@ -864,8 +938,10 @@ func (lv *LeafveinServer) staticFileHandle(rw http.ResponseWriter, req *http.Req
 
 /**
  *	start leafvein server
+ *
+ *	@param goroutine true is go func(){ // run serve }(), 关键保留一些操作在主线程来运行, 不知道的可以false
  */
-func (lv *LeafveinServer) Start() {
+func (lv *LeafveinServer) Start(goroutine bool) {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
@@ -873,14 +949,14 @@ func (lv *LeafveinServer) Start() {
 	lv.isDevel = FlagDeveloper
 
 	if FlagDeveloper {
-		lv.start("DevelStart")
+		lv.start("DevelStart", goroutine)
 	} else {
 		args := flag.Args()
 		if 0 < len(args) {
 			fmt.Println("incorrect command arguments. \n [-devel] = developer mode, [(nil)] = produce mode.")
 			return
 		}
-		lv.start("Start")
+		lv.start("Start", goroutine)
 	}
 }
 
@@ -1121,17 +1197,51 @@ func (lv *LeafveinServer) WebRootDir() string {
  *	TODO Temporarily invalid, keep extension
  */
 func (lv *LeafveinServer) Close() {
-	if nil != lv.listener {
+
+	//	由于tlsListener 和 listener 启动的逻辑不一样，所以分别关闭
+
+	if nil != lv.tlsListener && nil != lv.listener {
+
+		err := lv.listener.Close()
+		if nil != err {
+			lv.log.Fatal("(http) %v", err)
+		}
+		lv.log.Warn("Leafveingo http://%v:%v closed", lv.addr, lv.port)
+
+		err = lv.tlsListener.Close()
+		if nil != err {
+			lv.log.Fatal("(tls) %v", err)
+		}
+
+		lv.log.Warn("Leafveingo https://%v:%v closed", lv.addr, lv.tlsPort)
+		lv.isStart = false
+		lv.free()
+
+	} else if nil != lv.tlsListener {
+
+		err := lv.tlsListener.Close()
+		if nil != err {
+			lv.log.Fatal("(tls) %v", err)
+		}
+
+		lv.log.Warn("Leafveingo https://%v:%v closed", lv.addr, lv.tlsPort)
+		lv.isStart = false
+		lv.free()
+
+	} else if nil != lv.listener {
+
 		err := lv.listener.Close()
 		if nil != err {
 			lv.log.Fatal("%v", err)
 		}
-		lv.log.Info("Leafveingo http://%v:%v closed", lv.addr, lv.port)
+		lv.log.Warn("Leafveingo http://%v:%v closed", lv.addr, lv.port)
 		lv.isStart = false
 		lv.free()
+
 	} else {
 		lv.log.Fatal("current http listener nil, can not be closed")
 	}
+
 }
 
 //# mark LeafveinServer get set method -------------------------------------------------------------------------------------------
@@ -1555,9 +1665,9 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)
 
 	if nil != option {
-		lv.log.Info("request info: [%s,%s][%s,%s,%d]%#v %#v ", context.RequestScheme().String(), reqHost, option.RequestMethod, option.RouterKey, statusCode, reqPath, option.RouterPath)
+		lv.log.Info("request info: (%s)[%s,%s][%s,%s,%d]%#v %#v ", lv.AppName(), context.RequestScheme().String(), reqHost, option.RequestMethod, option.RouterKey, statusCode, reqPath, option.RouterPath)
 	} else {
-		lv.log.Info("request info: [%s,%s][%s,nil,%d]%#v ", context.RequestScheme().String(), reqHost, req.Method, statusCode, reqPath)
+		lv.log.Info("request info: (%s)[%s,%s][%s,nil,%d]%#v ", lv.AppName(), context.RequestScheme().String(), reqHost, req.Method, statusCode, reqPath)
 	}
 
 	errstr := ""

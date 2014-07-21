@@ -126,16 +126,14 @@ type Config struct {
  *	@param jsonData
  *	@return load error info
  */
-func configLoadByJson(jsonData []byte) (*Config, error) {
-
-	c := new(Config)
+func configLoadByJson(jsonData []byte, c *Config) error {
 
 	e2 := json.Unmarshal(jsonData, c)
 	if nil != e2 {
-		return nil, e2
+		return e2
 	}
 
-	return c, nil
+	return nil
 }
 
 /**
@@ -144,7 +142,7 @@ func configLoadByJson(jsonData []byte) (*Config, error) {
  *	@param configPath
  *	@return error info
  */
-func configLoadByFilepath(configPath string) (*Config, error) {
+func configLoadByFilepath(configPath string, c *Config) error {
 
 	var path string
 	if filepath.IsAbs(configPath) {
@@ -155,13 +153,13 @@ func configLoadByFilepath(configPath string) (*Config, error) {
 
 	isExists, isDir, _ := SFFileManager.Exists(path)
 	if !isExists || isDir {
-		return nil, errors.New("failed to load configuration file:" + configPath)
+		return errors.New("failed to load configuration file:" + configPath)
 	}
 
 	jsonData, e1 := ioutil.ReadFile(path)
 	if nil != e1 {
-		return nil, e1
+		return e1
 	}
 
-	return configLoadByJson(jsonData)
+	return configLoadByJson(jsonData, c)
 }
