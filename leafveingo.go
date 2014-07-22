@@ -1672,10 +1672,14 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//	router parse
 	router, option, statusCode := routerParse(context, reqPath[:len(reqPath)-len(reqSuffix)], reqSuffix)
 
+	//	log info buffer
+	logBuf := bytes.NewBuffer([]byte{})
+	timeNow := time.Now()
+
 	if nil != option {
-		lv.log.Info("request info: (%s)[%s,%s][%s,%s,%d]%#v %#v ", lv.AppName(), context.RequestScheme().String(), reqHost, option.RequestMethod, option.RouterKey, statusCode, reqPath, option.RouterPath)
+		fmt.Fprintf(logBuf, "[%d.%d]request info: (%s)[%s,%s][%s,%s,%d]%#v %#v \n", timeNow.Second(), timeNow.Nanosecond(), lv.AppName(), context.RequestScheme().String(), reqHost, option.RequestMethod, option.RouterKey, statusCode, reqPath, option.RouterPath)
 	} else {
-		lv.log.Info("request info: (%s)[%s,%s][%s,nil,%d]%#v ", lv.AppName(), context.RequestScheme().String(), reqHost, req.Method, statusCode, reqPath)
+		fmt.Fprintf(logBuf, "[%d.%d]request info: (%s)[%s,%s][%s,nil,%d]%#v \n", timeNow.Second(), timeNow.Nanosecond(), lv.AppName(), context.RequestScheme().String(), reqHost, req.Method, statusCode, reqPath)
 	}
 
 	errstr := ""
@@ -1684,7 +1688,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if Status200 == statusCode && nil != router {
 
 		// call controller func and return value handle
-		statusCode, err = controllerCallHandle(context, router, option, false, "")
+		statusCode, err = controllerCallHandle(context, router, option, false, "", logBuf)
 
 		if nil != err {
 			if Status200 == statusCode {
@@ -1719,5 +1723,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	lv.log.Info("status code: (" + StatusCodeToString(statusCode) + ")" + errstr + "\n")
+	timeNow = time.Now()
+	fmt.Fprintf(logBuf, "[%d.%d]status code: (%s)%s \n", timeNow.Second(), timeNow.Nanosecond(), StatusCodeToString(statusCode), errstr)
+	lv.log.Info(logBuf.String())
 }

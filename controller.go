@@ -23,12 +23,15 @@
 package leafveingo
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/slowfei/gosfcore/encoding/json"
 	"github.com/slowfei/gosfcore/utils/filemanager"
 	"github.com/slowfei/leafveingo/template"
 	"net/http"
 	"path"
 	"reflect"
+	"time"
 )
 
 var (
@@ -139,8 +142,11 @@ type AdeRouterController interface {
  *	@param funcName		controller call func name
  *	@param isDisp		is Dispatcher
  *	@param dispFunaName no dispatcher to nil
+ *	@param logBuf		log info buffer
+ *	@return statusCode
+ *	@return err
  */
-func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOption, isDisp bool, dispFunaName string) (statusCode HttpStatus, err error) {
+func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOption, isDisp bool, dispFunaName string, logBuf *bytes.Buffer) (statusCode HttpStatus, err error) {
 
 	var funcName string = ""
 	var returnValue interface{} = nil
@@ -159,14 +165,14 @@ func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOp
 	//	parse form params
 	paramErr := context.parseForm()
 
+	timeNow := time.Now()
 	if nil == paramErr {
-		context.lvServer.log.Info("request fileNum: %d; params: %v ", len(context.formparams.files), context.formparams.params)
+		fmt.Fprintf(logBuf, "[%d.%d]request fileNum: %d; params: %v \n", timeNow.Second(), timeNow.Nanosecond(), len(context.formparams.files), context.formparams.params)
 	} else {
-		context.lvServer.log.Info("request params(error):" + paramErr.Error())
+		fmt.Fprintf(logBuf, "[%d.%d]request params(error): %s \n", timeNow.Second(), timeNow.Nanosecond(), paramErr.Error())
 	}
-
-	//	controller info print
-	context.lvServer.log.Info("func name: [" + funcName + "] " + "controller info" + dispstr + ": " + router.Info())
+	//	controller info
+	fmt.Fprintf(logBuf, "[%d.%d]func name: [\"%s\"] controller info%s: %s \n", timeNow.Second(), timeNow.Nanosecond(), funcName, dispstr, router.Info())
 
 	if Status200 != statusCode || nil != err {
 		return
@@ -185,7 +191,7 @@ func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOp
 		if Status200 == statusCode && nil == err {
 			if nil != returnValue {
 				//	return value handle
-				statusCode, err = controllerReturnValueHandle(returnValue, context, router, option, funcName)
+				statusCode, err = controllerReturnValueHandle(returnValue, context, router, option, funcName, logBuf)
 			}
 		}
 	}
@@ -204,10 +210,11 @@ func controllerCallHandle(context *HttpContext, router IRouter, option *RouterOp
  *	@param router		router interface
  *	@param option		router option
  *	@param funcName		request call controller func name
+ *	@param logBuf		log info buffer
  *	@return statusCode	http status code
  *	@return err			error info
  */
-func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, router IRouter, option *RouterOption, funcName string) (statusCode HttpStatus, err error) {
+func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, router IRouter, option *RouterOption, funcName string, logBuf *bytes.Buffer) (statusCode HttpStatus, err error) {
 	statusCode = Status200
 
 	lv := context.lvServer
@@ -268,7 +275,7 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 			}
 		}
 
-		lv.log.Info("access template path: \"" + cvt.TplPath + "\"")
+		fmt.Fprintf(logBuf, "access template path: \"%s\"", cvt.TplPath)
 
 		e := lv.template.Execute(context.ComperssWriter(), cvt)
 
@@ -299,7 +306,7 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 			//	TODO 这样转发可能存在隐藏性的问题，关键在于option的作用。但目前的代码设计来说还不存在大的问题。
 			option.RouterKey = cvt.RouterKey
 			option.RouterPath = ""
-			statusCode, err = controllerCallHandle(context, router, option, true, cvt.FuncName)
+			statusCode, err = controllerCallHandle(context, router, option, true, cvt.FuncName, logBuf)
 
 		} else {
 			statusCode = Status500
