@@ -20,14 +20,14 @@ func main() {
 		3. https 演示操作
 
 			   编译 go build
-		开发模式运行 ./multiproject_samplebuild -devel
+		开发模式启动 ./multiproject_samplebuild -devel
 		启动后浏览器打开地址：http://localhost:8080/index.html
 		---------------------------------------------------------------------------------
 	*/
 
 	/*
 		-----------------
-		default server
+		slowfei.com and blog.slowfei.com server
 	*/
 	option := leafveingo.DefaultOption().SetConfigPath("multiproject/config/app.conf").SetAddr("127.0.0.1").SetPort(8080).SetSMGCTime(300)
 	server := leafveingo.NewLeafveinServer("multiproject", option)
@@ -72,7 +72,8 @@ func main() {
 		-----------------
 		admin server
 		将后台管理的服务用另一个端口进行访问
-		SetPort(0)默认会配置8080，可能会起冲突，如果设置HttpTLS独立反问就没有问题SetHttpTLS(...,...,true)
+		SetPort(0)默认会配置8080。
+		如果需要只开启https SetPort(0)可以随意设置，但是SetHttpTLS(...,...,true) aloneRun必须设置独立运行
 	*/
 	optionAdmin := leafveingo.DefaultOption().SetConfigPath("admin/config/app.conf").SetAddr("127.0.0.1").SetPort(0).SetSMGCTime(300)
 	serverAdmin := leafveingo.NewLeafveinServer("admin", optionAdmin)

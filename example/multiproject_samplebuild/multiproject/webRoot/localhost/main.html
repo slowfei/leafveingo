@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>multiproject - Hello world</title>
+	<link rel="stylesheet" href="/themes/core/core.css">
+	<link rel="stylesheet" href="/themes/default/css/style.css">
+</head>
+<body>
+
+	<h1>同一个端口下建立两个项目</h1>
+	<div>详细可以查看main.go关键的配置代码</div>
+	
+	<a href="/?host=slowfei.com">slowfei.com</a>
+	<div>http://localhost:8080/?host=slowfei.com</div>
+
+	<a href="/?host=blog.slowfei.com">blog.slowfei.com</a>
+	<div>http://localhost:8080/?host=blog.slowfei.com</div>
+
+	<div>
+		由于在本地操作运行，没有绑定到域名无法获取headers(host)，当使用localhost进行访问时可以使用?host=slowfei.com暂时代替域名（需要开发模式启动）。<br/><br/>
+		路由存储结构：
+		<pre>
+比较host对应后，然后再根据存储的router key查询相应的路由控制器
+[
+	{
+		host : "slowfei.com",
+		routers : {
+			key    : "/"(router key),
+			value : IRouter(存储了控制器),
+			...
+		}
+	},
+	{
+		host : "blog.slowfei.com",
+		routers : {
+			key    : "/"(router key),
+			value : IRouter(存储了控制器),
+			...
+		}
+	}
+
+]
+		</pre>
+	</div>
+	<pre>
+...
+//创建服务
+option := leafveingo.DefaultOption().SetConfigPath("multiproject/config/app.conf").SetAddr("127.0.0.1").SetPort(8080).SetSMGCTime(300)
+server := leafveingo.NewLeafveinServer("multiproject", option)
+
+//	多项目支持配置
+server.SetMultiProjectHosts("slowfei.com", "blog.slowfei.com")
+
+//	同时还需要配置控制器访问的host
+
+//	slowfei.com
+wwwOption := router.DefaultReflectRouterOption().SetHost("slowfei.com")
+server.AddRouter(router.CreateReflectControllerWithOption("/", www.WWWController{}, wwwOption))
+
+//	blog.slowfei.com
+blogOption := router.DefaultReflectRouterOption().SetHost("blog.slowfei.com")
+server.AddRouter(router.CreateReflectControllerWithOption("/", blog.BlogController{}, blogOption))
+
+...
+	</pre>
+
+<h1>使用https建立一个后端服务</h1>
+<a href="https://localhost:8090/">admin</a>
+<div>https://localhost:8090/</div>
+	<pre>
+...
+//	创建一个只允许https访问的服务
+optionAdmin := leafveingo.DefaultOption().SetConfigPath("admin/config/app.conf").SetAddr("127.0.0.1").SetPort(0).SetSMGCTime(300)
+serverAdmin := leafveingo.NewLeafveinServer("admin", optionAdmin)
+serverAdmin.SetHttpTLS("multiproject/config/cert.pem", "multiproject/config/key.pem", 8090, true)
+
+// 控制器只支持https访问
+adminRouterOption := router.DefaultReflectRouterOption().SetScheme(leafveingo.URI_SCHEME_HTTPS)
+serverAdmin.AddRouter(router.CreateReflectControllerWithOption("/", &admin.AdminController{}, adminRouterOption))
+
+//	由于创建了多个服务，所以需要使用以下代码进行启动
+leafveingo.Start()
+
+...
+	</pre>
+
+
+<br/><br/><br/><br/><br/><br/><br/>
+</body>
+</html>
