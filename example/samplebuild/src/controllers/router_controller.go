@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	_urlrexForum  = regexp.MustCompile(`^forum-([0-9]+)-([0-9]+)(\.\w+)?$`)
-	_urlrexThread = regexp.MustCompile(`^thread-(?P<bid>[0-9]+)-(?P<tid>[0-9]+)-(?P<pid>[0-9]+)$`)
-	_urlrexSpace  = regexp.MustCompile(`^space/(username|uid)/(.+)/$`)
-	_urlrexMD5    = regexp.MustCompile(`^[0-9a-zA-Z]{32}$`)
+	_urlrexForum  = regexp.MustCompile(`forum-([0-9]+)-([0-9]+)(\.\w+)?`)
+	_urlrexThread = regexp.MustCompile(`thread-(?P<bid>[0-9]+)-(?P<tid>[0-9]+)-(?P<pid>[0-9]+)`)
+	_urlrexSpace  = regexp.MustCompile(`space/(username|uid)/(.+)/`)
+	_urlrexMD5    = regexp.MustCompile(`[0-9a-zA-Z]{32}`)
 )
 
 //	高级路由器演示控制器
