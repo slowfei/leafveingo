@@ -239,7 +239,7 @@ func controllerReturnValueHandle(returnValue interface{}, context *HttpContext, 
 	case SFJson.Json:
 
 		context.RespWrite.Header().Set("Content-Type", "application/json; charset="+lv.Charset())
-		context.RespBodyWrite(cvt.Byte(), Status200)
+		context.RespBodyWrite(cvt.Bytes(), Status200)
 
 	case HtmlOut:
 
