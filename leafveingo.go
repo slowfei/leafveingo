@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2014-07-21
+//  Update on 2015-07-31
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
@@ -915,6 +915,8 @@ func (lv *LeafveinServer) staticFileHandle(rw http.ResponseWriter, req *http.Req
 			filePath = lv.WebRootDir() + reqPath
 		}
 
+		// TODO 考虑使用Join链接路径，然后join后的路径控制在WebRoot目录内的范围，不可越过WebRoot路径。
+
 		if isExists, isDir, _ := SFFileManager.Exists(filePath); isExists && !isDir {
 			//	处理http.ServeFile函数遇到/index.html被重定向到./的问题
 			if strings.HasSuffix(reqPath, INDEX_PAGE) {
@@ -1100,6 +1102,16 @@ func (lv *LeafveinServer) AddRouter(router IRouter) {
  */
 func (lv *LeafveinServer) AddCacheTemplate(tplName, src string) error {
 	return lv.template.AddCacheTemplate(tplName, src)
+}
+
+/**
+ *	add template function
+ *
+ *	@param `key`		 the template use func key, please ignore repeated system
+ *	@param `methodFunc`
+ */
+func (lv *LeafveinServer) AddTemplateFunc(key string, methodFunc interface{}) {
+	lv.template.SetFunc(key, methodFunc)
 }
 
 /**

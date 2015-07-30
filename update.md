@@ -20,6 +20,7 @@ Leafveingo update log
 > * (新增)https的支持，可与http一起使用(不同端口处理)
 > * samlpe案例整改后重新修订完成
 > * multiproject多项目集成案例
+> * leafveingo.go 增加模版函数的自定义添加AddTemplateFunc(...)
 
 1. 
 
