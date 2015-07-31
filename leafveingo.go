@@ -826,7 +826,15 @@ func (lv *LeafveinServer) requestURLHandle(rw http.ResponseWriter, req *http.Req
 
 	hostsCount := len(lv.multiProjectHosts)
 	if 0 != hostsCount {
-		reqHost = SFStringsUtil.ToLower(req.Host)
+
+		if 0 != len(lv.ipHeaderKey) {
+			reqHost = req.Header.Get(lv.ipHeaderKey)
+		}
+
+		if 0 == len(reqHost) {
+			reqHost = SFStringsUtil.ToLower(req.Host)
+		}
+
 		reqHostLen := len(reqHost)
 
 		if 0 == reqHostLen {
