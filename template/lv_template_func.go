@@ -12,9 +12,9 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
-//  Create on 2013-8-24
-//  Update on 2014-07-14
-//  Email  slowfei#foxmail.com
+//  Create on 2013-08-24
+//  Update on 2015-08-03
+//  Email  slowfei#nnyxing.com
 //  Home   http://www.slowfei.com
 
 //	leafveingo web 模板使用函数模块
@@ -36,12 +36,30 @@ import (
 func (l *Template) embedTempate(tplPath string, data interface{}) template.HTML {
 
 	tmpl, err := l.Parse(tplPath)
-	if nil != tmpl {
-		bufStr := bytes.NewBufferString("")
-		tmpl.Execute(bufStr, data)
-		return template.HTML(bufStr.String())
-	} else if nil != err {
-		return "(EmbedTempate error)"
+
+	if nil != err {
+		if l.IsDevel() {
+			return template.HTML(err.Error())
+		} else {
+			return "error code"
+		}
+	} else if nil != tmpl {
+		buf := bytes.NewBuffer(nil)
+		err = tmpl.Execute(buf, data)
+
+		if nil != err {
+			if l.IsDevel() {
+				return template.HTML(err.Error())
+			} else {
+				return "error code"
+			}
+		} else {
+			return template.HTML(buf.String())
+		}
+	}
+
+	if l.IsDevel() {
+		return "Embed Tempate Error"
 	} else {
 		return ""
 	}

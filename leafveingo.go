@@ -13,8 +13,8 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2015-07-31
-//  Email  slowfei#foxmail.com
+//  Update on 2015-08-03
+//  Email  slowfei#nnyxing.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
 
@@ -528,6 +528,7 @@ func (lv *LeafveinServer) parseRouter(logInfo *string, startName string) bool {
 	//	template
 	lv.template.SetBaseDir(lv.TemplateDir())
 	lv.template.SetCache(!lv.isDevel)
+	lv.template.SetDevel(lv.IsDevel())
 
 	//	add global touter
 	for _, router := range _globalRouterList {

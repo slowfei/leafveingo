@@ -13,8 +13,8 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-24
-//  Update on 2014-07-14
-//  Email  slowfei#foxmail.com
+//  Update on 2015-08-03
+//  Email  slowfei#nnyxing.com
 //  Home   http://www.slowfei.com
 
 //	leafveingo web 模板操作模块
@@ -95,6 +95,7 @@ type Template struct {
 	funcMap       template.FuncMap   // 模板函数
 	goTemplate    *template.Template // 唯一的模板管理
 	isCache       bool               // 是否加入缓存 默认false
+	isDevel       bool               // 是否属于开发模式 默认false
 	isCompactHTML bool               //	是否压缩HTML代码格式，默认true
 	leftDelims    string             //	set the action delimiters left default {{
 	rightDelims   string             //	right default }}
@@ -195,8 +196,9 @@ func (l *Template) Parse(tplPath string) (tmpl *template.Template, err error) {
 	}
 
 	if fullPath := l.TemplatePathAtName(tplPath); 0 < len(fullPath) {
+		var read []byte
 
-		read, err := ioutil.ReadFile(fullPath)
+		read, err = ioutil.ReadFile(fullPath)
 		if nil != err {
 			return nil, err
 		}
@@ -211,6 +213,7 @@ func (l *Template) Parse(tplPath string) (tmpl *template.Template, err error) {
 
 		tmpl.Delims(l.leftDelims, l.rightDelims)
 		tmpl.Funcs(l.funcMap)
+
 		if _, err = tmpl.Parse(tplString); nil != err {
 			tmpl = nil
 		}
@@ -407,6 +410,20 @@ func (l *Template) SetCache(cache bool) {
  */
 func (l *Template) IsCache() bool {
 	return l.isCache
+}
+
+/**
+ *	is developer model
+ */
+func (l *Template) IsDevel() bool {
+	return l.isDevel
+}
+
+/**
+ *	set template developer model
+ */
+func (l *Template) SetDevel(isDevel bool) {
+	l.isDevel = isDevel
 }
 
 /**
