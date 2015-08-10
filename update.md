@@ -2,6 +2,10 @@
 Leafveingo update log
 =============
 
+####version 0.0.2.000 rc2
+1. ...
+
+
 ####version 0.0.2.000 rc1(欠缺文档,还未进行发布)
 1. 重新整理leafveingo
 > * 主要整改：独立端口的Server、灵活的路由接口
@@ -21,8 +25,9 @@ Leafveingo update log
 > * samlpe案例整改后重新修订完成
 > * multiproject多项目集成案例
 > * leafveingo.go 增加模版函数的自定义添加AddTemplateFunc(...)
-
-1. 
+> * leafveingo.go 增加爱设置了一个在请求前修改Request的函数. SetCorrectRequestFunc
+> * leafveingo.go 针对使用代理时，Request Header的Host Key获取真实的host
+> * template/lv_template.go 修改embedTempate嵌入模板函数的错误提示，template并且增加了开发模式的设置
 
 -----------
 ####version 0.0.1.000 rc2

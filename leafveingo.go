@@ -330,11 +330,12 @@ type LeafveinServer struct {
 
 	/* #mark system patams ******************/
 
-	application    *SFHelper.Map                 //	application
-	sessionManager *LVSession.HttpSessionManager //	http session manager
-	template       *LVTemplate.Template          //	template
-	log            *SFLog.SFLogger               // log
-	config         *Config                       // config info
+	application        *SFHelper.Map                 //	application
+	sessionManager     *LVSession.HttpSessionManager //	http session manager
+	template           *LVTemplate.Template          //	template
+	log                *SFLog.SFLogger               // log
+	config             *Config                       // config info
+	correctRequestFunc func(req *http.Request)       // modify request, before server request call.
 
 	//	current leafveingo the file operation directory
 	//	operatingDir 是根据 appName 建立的目录路径
@@ -828,14 +829,7 @@ func (lv *LeafveinServer) requestURLHandle(rw http.ResponseWriter, req *http.Req
 	hostsCount := len(lv.multiProjectHosts)
 	if 0 != hostsCount {
 
-		if 0 != len(lv.ipHeaderKey) {
-			reqHost = req.Header.Get(lv.ipHeaderKey)
-		}
-
-		if 0 == len(reqHost) {
-			reqHost = SFStringsUtil.ToLower(req.Host)
-		}
-
+		reqHost = SFStringsUtil.ToLower(req.Host)
 		reqHostLen := len(reqHost)
 
 		if 0 == reqHostLen {
@@ -1315,6 +1309,16 @@ func (lv *LeafveinServer) SetServerTimeout(seconds int64) {
 }
 
 /**
+ *	修正Requset的设置函数，由于在使用不同的http代理转发操作时解析的参数可能与golang操作的不符合。
+ *	所以建立此函数在请求前可根据使用的代理转发进行Request的修改。
+ *
+ *	@param `f` func(req *http.Request)
+ */
+func (l *LeafveinServer) SetCorrectRequestFunc(f func(req *http.Request)) {
+	l.correctRequestFunc = f
+}
+
+/**
  *	get server time out
  *
  *	@return
@@ -1668,9 +1672,12 @@ func (lv *LeafveinServer) TLSPort() int {
 func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	var context *HttpContext = nil
-	reqPath := req.URL.Path
-
 	defer lv.deferServeHTTP(&context, rw)
+
+	if nil != lv.correctRequestFunc {
+		lv.correctRequestFunc(req)
+	}
+	reqPath := req.URL.Path
 
 	//	url handle
 	reqSuffix, reqHost, urlHandlePass := lv.requestURLHandle(rw, req, reqPath)
