@@ -3,7 +3,8 @@ Leafveingo update log
 =============
 
 ####version 0.0.2.000 rc2
-1. ...
+1. session/lv_session.go 修正IPHeaderKey的处理
+2. leafveingo.go 修正结束时，状态代码的处理（增加302的过滤）
 
 
 ####version 0.0.2.000 rc1(欠缺文档,还未进行发布)

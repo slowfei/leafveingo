@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-24
-//  Update on 2014-07-10
+//  Update on 2015-08-12
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -352,7 +352,12 @@ func (sm *HttpSessionManager) getUserIPAddr(req *http.Request) (net.IP, bool) {
 
 	//	反向代理IP的获取
 	if 0 != len(sm.IPHeaderKey) {
-		userAddr = req.Header.Get(sm.IPHeaderKey)
+		headerVal := req.Header.Get(sm.IPHeaderKey)
+
+		//	TODO 如果获取设置了IPHeaderKey,但无法获取真实IP是否考虑其他处理。否则会使用系统的127.0.0.1:xxx，可能存在风险。
+		if 0 != len(headerVal) {
+			userAddr = headerVal
+		}
 	}
 
 	if 0 == len(userAddr) {

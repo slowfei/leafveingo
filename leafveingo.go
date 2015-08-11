@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-08-16
-//  Update on 2015-08-03
+//  Update on 2015-08-12
 //  Email  slowfei#nnyxing.com
 //  Home   http://www.slowfei.com
 //	version 0.0.2.000
@@ -1725,7 +1725,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			errstr = err.Error()
 		} else {
 			switch statusCode {
-			case Status200, Status301, Status307, StatusNil:
+			case Status200, Status301, Status302, Status307, StatusNil:
 			default:
 				errstr = StatusMsg(statusCode)
 			}
@@ -1733,7 +1733,7 @@ func (lv *LeafveinServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 		//	保留各个状态的特别处理
 		switch statusCode {
-		case Status200, Status301, Status307, StatusNil:
+		case Status200, Status301, Status302, Status307, StatusNil:
 			//	不作处理的状态
 		default:
 			if lv.IsDevel() {
