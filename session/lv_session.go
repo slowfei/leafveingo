@@ -13,7 +13,7 @@
 //   limitations under the License.
 //
 //  Create on 2013-8-24
-//  Update on 2015-08-12
+//  Update on 2015-10-06
 //  Email  slowfei#foxmail.com
 //  Home   http://www.slowfei.com
 
@@ -330,7 +330,7 @@ func (sm *HttpSessionManager) getUUID() (SFUUID.UUID, string) {
 	case SIDTypeIPUUID:
 		uuid = SFUUID.NewIPUUID()
 	case SIDTypeRandomUUID:
-		uuid = SFUUID.NewRandomUUID()
+		uuid = SFUUID.NewUUID()
 	}
 
 	if nil == uuid {
